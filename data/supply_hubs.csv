@@ -1,0 +1,4 @@
+hub_id,hub_name,hub_location,transport_mode,base_distance_km,aircraft_type,aircraft_capacity_tonnes
+HUB-DXB,Dubai Humanitarian (DWC) Hub,"Dubai, UAE",Air + Road,2450,IL-76 / A330F,40
+HUB-AMM,Amman Forward Logistics Hub,"Amman, Jordan",Air + Road,260,C-130,18
+HUB-ARI,El Arish Staging Hub,"El Arish, Egypt",Road,55,Truck convoy (equiv.),30
