@@ -147,7 +147,12 @@ def get_hub_resources(daily_stock, daily_flights, hub_id):
 
     return hub_stock, hub_flights
 
-def allocate_request(request, allocated, hub_resources):
+    """Process a player's resource allocation for an emergency request.
+    Check if the allocation is valid, update the remaining hub
+    resources, and automatically record the successful allocation.
+    Return the request's fulfilment status or "Allocation Failed"
+    if the allocation is invalid. """
+def allocate_request(request, allocated, hub_resources, allocation_history):
     hub_id = request["supply_hub"]
 
     required = [
@@ -175,7 +180,13 @@ def allocate_request(request, allocated, hub_resources):
     resources["capacity"] = remaining_capacity
     resources["slots"] = remaining_slots
 
-    return check_request_fulfilment(required, allocated)
+    status = check_request_fulfilment(required, allocated)
+
+    # Automatically save successful allocation
+    record = record_allocation(request, allocated, status)
+    allocation_history.append(record)
+
+    return status
 
 def record_allocation(request, allocated, status):
     record = {
