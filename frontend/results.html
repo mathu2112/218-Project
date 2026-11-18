@@ -1,1 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Results | Humanitarian Air Bridge</title>
+    <link rel="stylesheet" href="style.css">
 
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #e8f4ff;
+            background:
+                linear-gradient(rgba(0,210,235,.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,210,235,.035) 1px, transparent 1px),
+                radial-gradient(ellipse at 85% 0%, #12354a, #071529 45%, #030b1d);
+            background-size: 55px 55px, 55px 55px, cover;
+            background-attachment: fixed;
+        }
+
+        .game-header {
+            padding: 24px 7%;
+            background: rgba(4,17,36,.95);
+            border-bottom: 1px solid rgba(0,219,234,.25);
+            text-align: left;
+        }
+
+        .game-header h1 {
+            margin: 0;
+            color: #40e8f3;
+            font-size: 29px;
+            text-shadow: 0 0 20px rgba(0,225,240,.3);
+        }
+
+        .game-header p {
+            margin: 8px 0 0;
+            color: #91aebf;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .game-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 16px 7%;
+            background: rgba(4,17,36,.75);
+            border-bottom: 1px solid rgba(0,219,234,.12);
+        }
+
+        .game-nav a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: #a9c5d5;
+            text-decoration: none;
+            font-size: 15px;
+            transition: .25s ease;
+        }
+
+        .game-nav a:hover,
+        .game-nav a.active {
+            color: #40e8f3;
+            background: rgba(0,219,234,.09);
+            border-color: rgba(0,219,234,.45);
+        }
+
+        .nav-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            font-size: 19px;
+        }
+
+        .game-container {
+            max-width: 1250px;
+            margin: auto;
+            padding: 45px 28px 70px;
+        }
+
+        .game-title {
+            margin: 0 0 15px;
+            color: #40e8f3;
+            font-size: clamp(30px, 4vw, 46px);
+            text-shadow: 0 0 24px rgba(0,225,240,.25);
+        }
+
+        .game-subtitle {
+            color: #a9bfd1;
+            font-size: 16px;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .results-panel {
+            margin-bottom: 25px;
+            padding: 28px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #0e2a42, #081a30);
+            border: 1px solid rgba(0,219,234,.28);
+            box-shadow: 0 0 30px rgba(0,219,234,.05);
+        }
+
+        .results-panel h2 {
+            color: #40e8f3;
+            font-size: 23px;
+            margin: 0 0 18px;
+        }
+
+        .results-panel p {
+            color: #b8cede;
+            line-height: 1.8;
+        }
+
+        .section-note {
+            color: #91aebf;
+            font-size: 13px;
+        }
+
+        /* ALLOCATION TABLE */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 22px;
+        }
+
+        .allocation-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 550px;
+        }
+
+        .allocation-table th {
+            padding: 17px;
+            text-align: left;
+            background: #0a3348;
+            color: #40e8f3;
+            border-bottom: 1px solid #24566a;
+        }
+
+        .allocation-table td {
+            padding: 17px;
+            border-bottom: 1px solid #1d3d52;
+            color: #d7e7f2;
+        }
+
+        .allocation-table tr:hover td {
+            background: rgba(0,219,234,.04);
+        }
+
+        .allocation-table .total-row td {
+            background: #0b2d40;
+            color: #40e8f3;
+            font-weight: bold;
+            border-top: 2px solid #00dbea;
+        }
+
+        .number-cell {
+            text-align: right !important;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* SUMMARY CARDS */
+
+        .results-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            margin: 28px 0;
+        }
+
+        .result-card {
+            padding: 25px;
+            border-radius: 17px;
+            background: linear-gradient(145deg, #0d2840, #091a31);
+            border: 1px solid rgba(0,219,234,.24);
+        }
+
+        .result-card h3 {
+            margin: 0 0 16px;
+            color: #a9c5d5;
+            font-size: 15px;
+            font-weight: normal;
+        }
+
+        .result-card strong {
+            display: block;
+            color: #40e8f3;
+            font-size: 34px;
+        }
+
+        .result-card small {
+            display: block;
+            color: #91aebf;
+            margin-top: 8px;
+        }
+
+        /* COMPARISON GRAPH */
+
+        .graph-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 15px 0 28px;
+            color: #b8cede;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+        }
+
+        .human-dot {
+            background: #40e8f3;
+        }
+
+        .ai-dot {
+            background: #9b8cff;
+        }
+
+        .graph-row {
+            margin: 28px 0;
+        }
+
+        .graph-label {
+            margin-bottom: 12px;
+            color: #e8f4ff;
+            font-weight: bold;
+        }
+
+        .graph-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bar-line {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-name {
+            width: 60px;
+            flex-shrink: 0;
+            color: #9db2c6;
+            font-size: 13px;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 24px;
+            border-radius: 6px;
+            background: #06182b;
+            overflow: hidden;
+            border: 1px solid #1e3d54;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 5px;
+            transition: width .5s ease;
+        }
+
+        .human-fill {
+            background: linear-gradient(90deg, #087d95, #40e8f3);
+        }
+
+        .ai-fill {
+            background: linear-gradient(90deg, #6554bc, #9b8cff);
+        }
+
+        .bar-value {
+            width: 55px;
+            text-align: right;
+            color: #e8f4ff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* REMAINING NEEDS COMPARISON */
+
+        .needs-comparison {
+            margin: 28px 0;
+            padding: 22px;
+            background: rgba(4,17,36,.45);
+            border: 1px solid #234960;
+            border-radius: 14px;
+        }
+
+        .needs-title {
+            color: #e8f4ff;
+            font-size: 19px;
+            font-weight: bold;
+            margin-bottom: 22px;
+        }
+
+        .needs-person {
+            margin: 18px 0;
+        }
+
+        .needs-person-heading {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+            color: #b8cede;
+        }
+
+        .needs-person-heading strong {
+            color: #e8f4ff;
+        }
+
+        .needs-track {
+            height: 15px;
+            border-radius: 20px;
+            background: #06182b;
+            border: 1px solid #28566a;
+            overflow: hidden;
+        }
+
+        .needs-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 20px;
+            transition: width .5s ease;
+        }
+
+        .needs-fill.human {
+            background: linear-gradient(90deg, #087d95, #40e8f3);
+        }
+
+        .needs-fill.ai {
+            background: linear-gradient(90deg, #6554bc, #9b8cff);
+        }
+
+        .needs-details {
+            margin: 9px 0 0;
+            color: #9cb7c9;
+            font-size: 14px;
+        }
+
+        /* TRANSPORT CAPACITY */
+
+        .progress-section {
+            margin: 25px 0;
+        }
+
+        .progress-heading {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+            color: #e8f4ff;
+        }
+
+        .progress-heading strong {
+            color: #40e8f3;
+        }
+
+        .progress-track {
+            height: 15px;
+            border-radius: 20px;
+            background: #06182b;
+            border: 1px solid #28566a;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #087d95, #40e8f3);
+            border-radius: 20px;
+            transition: width .5s ease;
+        }
+
+        .progress-fill.ai {
+            background: linear-gradient(90deg, #6554bc, #9b8cff);
+        }
+
+        /* FEEDBACK */
+
+        .status-message {
+            padding: 18px;
+            border-radius: 12px;
+            line-height: 1.8;
+            background: #091e32;
+            border: 1px solid #28566a;
+            color: #c2d8e6;
+        }
+
+        .status-message.success {
+            border-color: #40d6a0;
+            color: #b6ffe0;
+            background: rgba(64,214,160,.08);
+        }
+
+        .status-message.warning {
+            border-color: #ffc857;
+            color: #ffe5a5;
+            background: rgba(255,200,87,.07);
+        }
+
+        /* BUTTONS */
+
+        .game-button {
+            display: inline-block;
+            margin: 8px 10px 8px 0;
+            padding: 13px 20px;
+            border-radius: 11px;
+            border: 1px solid #00dbea;
+            background: linear-gradient(110deg, #073b50, #0b2b40);
+            color: #40e8f3;
+            font-size: 15px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+            transition: .25s ease;
+        }
+
+        .game-button:hover {
+            background: #00dbea;
+            color: #031020;
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(0,219,234,.35);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 45px 20px;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        @media (max-width: 650px) {
+            .game-header,
+            .game-nav {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .game-container {
+                padding: 30px 18px;
+            }
+
+            .results-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .results-panel {
+                padding: 20px;
+            }
+
+            .bar-name {
+                width: 45px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="game-header">
+    <h1>✈️ Humanitarian Air Bridge</h1>
+    <p>Humanitarian Logistics Simulation</p>
+</header>
+
+<nav class="game-nav">
+    <a href="home.html">
+        <span class="nav-icon">🏠</span> Home
+    </a>
+
+    <a href="requests.html">
+        <span class="nav-icon">🚨</span> Emergency Requests
+    </a>
+
+    <a href="allocation.html">
+        <span class="nav-icon">📦</span> Resource Allocation
+    </a>
+
+    <a href="results.html" class="active">
+        <span class="nav-icon">📊</span> Simulation Results
+    </a>
+</nav>
+
+<main class="game-container">
+
+    <h1 class="game-title">📊 Simulation Results</h1>
+
+    <p class="game-subtitle">
+        Compare your allocation with the demonstration AI
+        recommendation and review remaining emergency needs.
+    </p>
+
+    <!-- EMPTY STATE -->
+
+    <section id="emptyState" class="results-panel empty-state" hidden>
+        <h2>📦 No Allocation Submitted Yet</h2>
+
+        <p>
+            Select an emergency and confirm your allocation
+            to view the comparison.
+        </p>
+
+        <a href="requests.html" class="game-button">
+            View Emergency Requests →
+        </a>
+    </section>
+
+    <div id="resultsContent" hidden>
+
+        <!-- HUMAN VS AI TABLE -->
+
+        <section class="results-panel">
+            <h2>📋 Human vs AI Allocation Summary</h2>
+
+            <p id="summaryContext">
+                Latest confirmed emergency allocation.
+            </p>
+
+            <div class="table-wrapper">
+                <table class="allocation-table">
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th class="number-cell">Human Allocation</th>
+                            <th class="number-cell">AI Recommendation</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td>💊 Medicine</td>
+                            <td class="number-cell" id="humanMedicine">0</td>
+                            <td class="number-cell" id="aiMedicine">0</td>
+                        </tr>
+
+                        <tr>
+                            <td>⛺ Shelter</td>
+                            <td class="number-cell" id="humanShelter">0</td>
+                            <td class="number-cell" id="aiShelter">0</td>
+                        </tr>
+
+                        <tr>
+                            <td>🥫 Nutrition</td>
+                            <td class="number-cell" id="humanNutrition">0</td>
+                            <td class="number-cell" id="aiNutrition">0</td>
+                        </tr>
+
+                        <tr class="total-row">
+                            <td>📦 TOTAL ALLOCATED</td>
+                            <td class="number-cell" id="humanTotal">0</td>
+                            <td class="number-cell" id="aiTotal">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="section-note">
+                The AI column currently shows a rule-based
+                demonstration recommendation, not a trained AI model.
+            </p>
+        </section>
+
+        <!-- SUMMARY CARDS -->
+
+        <section class="results-stats">
+            <div class="result-card">
+                <h3>👤 Human Allocated</h3>
+                <strong id="humanCard">0</strong>
+                <small>Total resource units</small>
+            </div>
+
+            <div class="result-card">
+                <h3>🤖 AI Recommended</h3>
+                <strong id="aiCard">0</strong>
+                <small>Total suggested units</small>
+            </div>
+
+            <div class="result-card">
+                <h3>🎯 Human Need Fulfilled</h3>
+                <strong id="fulfillmentCard">0%</strong>
+                <small>Percentage of requested units</small>
+            </div>
+        </section>
+
+        <!-- GRAPH -->
+
+        <section class="results-panel">
+            <h2>📊 Resource Allocation Comparison</h2>
+
+            <p>
+                Compare the resources allocated by the human
+                player with the quantities recommended by the AI advisor.
+            </p>
+
+            <div class="graph-legend">
+                <div class="legend-item">
+                    <span class="legend-dot human-dot"></span>
+                    Human Allocation
+                </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot ai-dot"></span>
+                    AI Recommendation
+                </div>
+            </div>
+
+            <div id="comparisonGraph"></div>
+        </section>
+
+        <!-- EMERGENCY OVERVIEW -->
+
+        <section class="results-panel">
+            <h2>🎯 Emergency Overview</h2>
+
+            <p><strong>Request ID:</strong> <span id="requestId"></span></p>
+            <p><strong>Location:</strong> <span id="location"></span></p>
+            <p><strong>Urgency:</strong> <span id="urgency"></span></p>
+            <p><strong>Assigned Supply Hub:</strong> <span id="hub"></span></p>
+        </section>
+
+        <!-- NEW REMAINING NEEDS SECTION -->
+
+        <section class="results-panel">
+            <h2>📦 Remaining Emergency Needs — Human vs AI</h2>
+
+            <p>
+                Compare how much demand the human player fulfilled
+                with the AI advisor's suggested allocation.
+                Each bar shows the percentage of demand covered.
+            </p>
+
+            <div id="needsContainer"></div>
+        </section>
+
+        <!-- TRANSPORT CAPACITY -->
+
+        <section class="results-panel">
+            <h2>✈️ Transport Capacity Comparison</h2>
+
+            <div class="progress-section">
+                <div class="progress-heading">
+                    <span>👤 Human Capacity Used</span>
+                    <strong id="humanCapacityLabel">0%</strong>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-fill" id="humanCapacityBar"></div>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-heading">
+                    <span>🤖 AI Recommended Capacity Used</span>
+                    <strong id="aiCapacityLabel">0%</strong>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-fill ai" id="aiCapacityBar"></div>
+                </div>
+            </div>
+
+            <p id="capacityDetails"></p>
+        </section>
+
+        <!-- FEEDBACK -->
+
+        <section class="results-panel">
+            <h2>📝 Allocation Analysis</h2>
+
+            <div id="allocationFeedback" class="status-message"></div>
+
+            <p class="section-note">
+                Allocating more units does not automatically mean
+                a better decision. The future AI evaluation will
+                also consider emergency priority and constraints.
+            </p>
+        </section>
+
+        <!-- NAVIGATION -->
+
+        <section class="results-panel">
+            <h2>🔄 Continue Simulation</h2>
+
+            <p>
+                Return to emergency requests or revise
+                your current allocation.
+            </p>
+
+            <a href="requests.html" class="game-button">
+                ← Emergency Requests
+            </a>
+
+            <a href="allocation.html" class="game-button">
+                Edit Allocation →
+            </a>
+        </section>
+
+    </div>
+
+</main>
+
+<script>
+    // FRONTEND DEMONSTRATION DATA
+
+    const emergencies = [
+        {
+            id: "REQ001",
+            medicine: 500,
+            shelter: 300,
+            nutrition: 600
+        },
+        {
+            id: "REQ002",
+            medicine: 250,
+            shelter: 400,
+            nutrition: 450
+        },
+        {
+            id: "REQ003",
+            medicine: 150,
+            shelter: 200,
+            nutrition: 300
+        }
+    ];
+
+    const hubs = {
+        hub1: {
+            name: "Supply Hub A",
+            flights: 3,
+            capacityPerFlight: 5
+        },
+
+        hub2: {
+            name: "Supply Hub B",
+            flights: 2,
+            capacityPerFlight: 4
+        }
+    };
+
+    const resourceWeights = {
+        medicine: 0.01,
+        shelter: 0.05,
+        nutrition: 0.02
+    };
+
+    const resourceTypes = [
+        "medicine",
+        "shelter",
+        "nutrition"
+    ];
+
+    const resourceLabels = {
+        medicine: "💊 Medicine",
+        shelter: "⛺ Shelter",
+        nutrition: "🥫 Nutrition"
+    };
+
+    function totalUnits(allocation) {
+        return resourceTypes.reduce(
+            (sum, resource) =>
+                sum + Number(allocation[resource] || 0),
+            0
+        );
+    }
+
+    function calculateWeight(allocation) {
+        return resourceTypes.reduce(
+            (sum, resource) =>
+                sum +
+                Number(allocation[resource] || 0) *
+                resourceWeights[resource],
+            0
+        );
+    }
+
+    function showEmptyState() {
+        document.getElementById("emptyState").hidden = false;
+        document.getElementById("resultsContent").hidden = true;
+    }
+
+    function showResults() {
+        const savedData =
+            sessionStorage.getItem("playerAllocation");
+
+        if (!savedData) {
+            showEmptyState();
+            return;
+        }
+
+        let result;
+
+        try {
+            result = JSON.parse(savedData);
+        } catch (error) {
+            showEmptyState();
+            return;
+        }
+
+        const emergency = emergencies.find(
+            item => item.id === result.requestId
+        );
+
+        const hub = hubs[result.hub];
+
+        if (!emergency || !hub || !result.allocation) {
+            showEmptyState();
+            return;
+        }
+
+        const human = result.allocation;
+
+        const ai = result.demoRecommendation || {
+            medicine: 0,
+            shelter: 0,
+            nutrition: 0
+        };
+
+        const humanTotal = totalUnits(human);
+        const aiTotal = totalUnits(ai);
+        const requestedTotal = totalUnits(emergency);
+
+        document.getElementById("emptyState").hidden = true;
+        document.getElementById("resultsContent").hidden = false;
+
+        // ALLOCATION TABLE
+
+        for (const resource of resourceTypes) {
+            const capitalized =
+                resource.charAt(0).toUpperCase() +
+                resource.slice(1);
+
+            document.getElementById(
+                "human" + capitalized
+            ).textContent =
+                Number(human[resource] || 0).toLocaleString();
+
+            document.getElementById(
+                "ai" + capitalized
+            ).textContent =
+                Number(ai[resource] || 0).toLocaleString();
+        }
+
+        document.getElementById("humanTotal").textContent =
+            humanTotal.toLocaleString();
+
+        document.getElementById("aiTotal").textContent =
+            aiTotal.toLocaleString();
+
+        document.getElementById("summaryContext").textContent =
+            `Latest confirmed allocation — ${result.location} ` +
+            `(${result.requestId}).`;
+
+        // SUMMARY CARDS
+
+        document.getElementById("humanCard").textContent =
+            humanTotal.toLocaleString();
+
+        document.getElementById("aiCard").textContent =
+            aiTotal.toLocaleString();
+
+        const fulfillment = requestedTotal > 0
+            ? (humanTotal / requestedTotal) * 100
+            : 100;
+
+        document.getElementById("fulfillmentCard").textContent =
+            fulfillment.toFixed(1) + "%";
+
+        // EMERGENCY DETAILS
+
+        document.getElementById("requestId").textContent =
+            result.requestId;
+
+        document.getElementById("location").textContent =
+            result.location;
+
+        document.getElementById("urgency").textContent =
+            result.urgency;
+
+        document.getElementById("hub").textContent =
+            hub.name;
+
+        // ALLOCATION COMPARISON GRAPH
+
+        const graph =
+            document.getElementById("comparisonGraph");
+
+        graph.innerHTML = "";
+
+        const maxValue = Math.max(
+            1,
+            ...resourceTypes.flatMap(resource => [
+                Number(human[resource] || 0),
+                Number(ai[resource] || 0)
+            ])
+        );
+
+        for (const resource of resourceTypes) {
+            const humanValue = Number(human[resource] || 0);
+            const aiValue = Number(ai[resource] || 0);
+
+            const humanWidth = (humanValue / maxValue) * 100;
+            const aiWidth = (aiValue / maxValue) * 100;
+
+            const row = document.createElement("div");
+            row.className = "graph-row";
+
+            row.innerHTML = `
+                <div class="graph-label">
+                    ${resourceLabels[resource]}
+                </div>
+
+                <div class="graph-bars">
+                    <div class="bar-line">
+                        <span class="bar-name">Human</span>
+
+                        <div class="bar-track">
+                            <div class="bar-fill human-fill"
+                                 style="width:${humanWidth}%">
+                            </div>
+                        </div>
+
+                        <span class="bar-value">${humanValue}</span>
+                    </div>
+
+                    <div class="bar-line">
+                        <span class="bar-name">AI</span>
+
+                        <div class="bar-track">
+                            <div class="bar-fill ai-fill"
+                                 style="width:${aiWidth}%">
+                            </div>
+                        </div>
+
+                        <span class="bar-value">${aiValue}</span>
+                    </div>
+                </div>
+            `;
+
+            graph.appendChild(row);
+        }
+
+        // HUMAN VS AI REMAINING EMERGENCY NEEDS
+
+        const needsContainer =
+            document.getElementById("needsContainer");
+
+        needsContainer.innerHTML = "";
+
+        for (const resource of resourceTypes) {
+            const needed = Number(emergency[resource]);
+
+            const humanAllocated =
+                Number(human[resource] || 0);
+
+            const aiAllocated =
+                Number(ai[resource] || 0);
+
+            const humanPercentage = needed > 0
+                ? Math.min(
+                    100,
+                    (humanAllocated / needed) * 100
+                )
+                : 100;
+
+            const aiPercentage = needed > 0
+                ? Math.min(
+                    100,
+                    (aiAllocated / needed) * 100
+                )
+                : 100;
+
+            const humanRemaining = Math.max(
+                0,
+                needed - humanAllocated
+            );
+
+            const aiRemaining = Math.max(
+                0,
+                needed - aiAllocated
+            );
+
+            const section = document.createElement("div");
+            section.className = "needs-comparison";
+
+            section.innerHTML = `
+                <div class="needs-title">
+                    ${resourceLabels[resource]}
+                    — ${needed} units needed
+                </div>
+
+                <div class="needs-person">
+                    <div class="needs-person-heading">
+                        <span>👤 Human Allocation</span>
+                        <strong>
+                            ${humanPercentage.toFixed(1)}%
+                        </strong>
+                    </div>
+
+                    <div class="needs-track">
+                        <div class="needs-fill human"
+                             style="width:${humanPercentage}%">
+                        </div>
+                    </div>
+
+                    <p class="needs-details">
+                        ${humanAllocated} units allocated.
+                        ${humanRemaining} units still needed.
+                    </p>
+                </div>
+
+                <div class="needs-person">
+                    <div class="needs-person-heading">
+                        <span>🤖 AI Recommendation</span>
+                        <strong>
+                            ${aiPercentage.toFixed(1)}%
+                        </strong>
+                    </div>
+
+                    <div class="needs-track">
+                        <div class="needs-fill ai"
+                             style="width:${aiPercentage}%">
+                        </div>
+                    </div>
+
+                    <p class="needs-details">
+                        ${aiAllocated} units recommended.
+                        ${aiRemaining} units would remain unmet.
+                    </p>
+                </div>
+            `;
+
+            needsContainer.appendChild(section);
+        }
+
+        // TRANSPORT CAPACITY
+
+        const capacity = hub.flights * hub.capacityPerFlight;
+
+        const humanWeight = calculateWeight(human);
+        const aiWeight = calculateWeight(ai);
+
+        const humanCapacityPercentage = capacity > 0
+            ? (humanWeight / capacity) * 100
+            : 0;
+
+        const aiCapacityPercentage = capacity > 0
+            ? (aiWeight / capacity) * 100
+            : 0;
+
+        document.getElementById("humanCapacityLabel")
+            .textContent =
+            humanCapacityPercentage.toFixed(1) + "%";
+
+        document.getElementById("aiCapacityLabel")
+            .textContent =
+            aiCapacityPercentage.toFixed(1) + "%";
+
+        document.getElementById("humanCapacityBar")
+            .style.width =
+            Math.min(100, humanCapacityPercentage) + "%";
+
+        document.getElementById("aiCapacityBar")
+            .style.width =
+            Math.min(100, aiCapacityPercentage) + "%";
+
+        document.getElementById("capacityDetails")
+            .textContent =
+            `Available capacity: ${capacity} tonnes. ` +
+            `Human allocation: ${humanWeight.toFixed(2)} tonnes. ` +
+            `AI recommendation: ${aiWeight.toFixed(2)} tonnes.`;
+
+        // ALLOCATION ANALYSIS
+
+        const feedback =
+            document.getElementById("allocationFeedback");
+
+        const humanRemainingTotal = Math.max(
+            0,
+            requestedTotal - humanTotal
+        );
+
+        const aiRemainingTotal = Math.max(
+            0,
+            requestedTotal - aiTotal
+        );
+
+        if (humanRemainingTotal === 0) {
+            feedback.className = "status-message success";
+
+            feedback.textContent =
+                "The human allocation covers all requested " +
+                "resource units for this emergency.";
+        } else {
+            feedback.className = "status-message warning";
+
+            feedback.textContent =
+                `Human allocation: ${humanTotal.toLocaleString()} units, ` +
+                `with ${humanRemainingTotal.toLocaleString()} units unmet. ` +
+                `Demo AI recommendation: ${aiTotal.toLocaleString()} units, ` +
+                `with ${aiRemainingTotal.toLocaleString()} units ` +
+                `that would remain unmet.`;
+        }
+    }
+
+    showResults();
+</script>
+
+</body>
+</html>
