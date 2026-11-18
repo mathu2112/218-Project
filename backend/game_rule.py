@@ -35,6 +35,10 @@ def reset_game():
 def can_allocate():
     return game_state == "ALLOCATING"
 
+# Return the current game state
+def get_game_state():
+    return game_state
+
 
 
 #GAME RULES
@@ -200,10 +204,3 @@ def record_allocation(request, allocated, status):
 
     return record
 
-from backend.load_data import load_data, get_requests, get_stock, get_flights, get_requests_by_date
-
-requests, locations, hubs, stock, flights = load_data()
-
-# Return the current game state
-def get_game_state():
-    return game_state

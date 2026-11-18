@@ -1,8 +1,17 @@
+
 from backend.game_rule import calculate_weight
+
+
 # FUZZY LOGIC AI ASSISTANT
+# Recommends resource allocations based on expert priority,
+# available supplies, and competing demand.
 
 
-# Low membership
+# --------------------------------------------------
+# 1. FUZZY MEMBERSHIP FUNCTIONS
+# --------------------------------------------------
+
+# Calculate how strongly a value belongs to the low category
 def low_membership(value):
     if value <= 1:
         return 1
@@ -13,7 +22,7 @@ def low_membership(value):
     return (4 - value) / 3
 
 
-# Medium membership
+# Calculate how strongly a value belongs to the medium category
 def medium_membership(value):
     if value <= 1 or value >= 5:
         return 0
@@ -24,7 +33,7 @@ def medium_membership(value):
     return (5 - value) / 2
 
 
-# High membership
+# Calculate how strongly a value belongs to the high category
 def high_membership(value):
     if value <= 2:
         return 0
@@ -35,104 +44,238 @@ def high_membership(value):
     return (value - 2) / 3
 
 
-# Convert affected population to a 1-5 scale
-def population_level(population):
-    if population <= 5000:
-        return 1
+# --------------------------------------------------
+# 2. CONVERT INPUTS INTO LEVELS
+# --------------------------------------------------
 
-    if population <= 10000:
-        return 2
+# Convert the instructor's expert priority label to a 1-5 level
+def priority_level(label):
 
-    if population <= 15000:
+    if label == "Critical":
+        return 5
+
+    if label == "High":
+        return 4
+
+    if label == "Medium":
         return 3
 
-    if population <= 20000:
+    if label == "Low":
+        return 1
+
+    return None
+
+
+# Measure how much stock is available compared to the request
+def availability_level(required, available):
+
+    if required <= 0:
+        return 5
+
+    # Compare available stock with required quantity
+    ratio = available / required
+
+    if ratio < 0.25:
+        return 1
+
+    if ratio < 0.50:
+        return 2
+
+    if ratio < 0.75:
+        return 3
+
+    if ratio < 1:
         return 4
 
     return 5
 
 
-# Calculate priority using fuzzy IF-THEN rules
-def calculate_priority(urgency, severity, population):
+# Measure total resource demand compared to available stock
+def demand_level(total_required, available):
 
-    # Convert population to a 1-5 scale
-    population = population_level(population)
+    if available <= 0:
+        return 5
 
-    # Rule 1: High urgency OR high severity OR high population
-    high = max(
-        high_membership(urgency),
-        high_membership(severity),
-        high_membership(population)
-    )
+    # Compare total demand with available stock
+    ratio = total_required / available
 
-    # Rule 2: Medium urgency OR medium severity OR medium population
-    medium = max(
-        medium_membership(urgency),
-        medium_membership(severity),
-        medium_membership(population)
-    )
+    if ratio < 0.5:
+        return 1
 
-    # Rule 3: Low urgency AND low severity AND low population
-    low = min(
-        low_membership(urgency),
-        low_membership(severity),
-        low_membership(population)
-    )
+    if ratio < 1:
+        return 2
 
-    # Calculate final priority score
-    total = high + medium + low
+    if ratio < 1.5:
+        return 3
 
-    if total == 0:
+    if ratio < 2:
+        return 4
+
+    return 5
+
+
+# --------------------------------------------------
+# 3. FUZZY ALLOCATION RULES
+# --------------------------------------------------
+
+# Calculate the recommended allocation percentage using fuzzy logic
+def fuzzy_allocation_percentage(priority, availability, demand):
+
+    # Convert the expert priority label into a numerical level
+    priority = priority_level(priority)
+
+    if priority is None:
         return 0
 
-    score = (high * 90 + medium * 50 + low * 10) / total
+    # Calculate fuzzy membership values for priority
+    priority_high = high_membership(priority)
+    priority_medium = medium_membership(priority)
+    priority_low = low_membership(priority)
 
-    return round(score, 2)
+    # Calculate fuzzy membership values for availability
+    availability_high = high_membership(availability)
+    availability_low = low_membership(availability)
 
-# Suggest resource allocations based on priority and stock
-def suggest_allocation(required, available, priority):
+    # Calculate fuzzy membership values for demand
+    demand_high = high_membership(demand)
+    demand_low = low_membership(demand)
 
-    if priority >= 70:
-        percentage = 1.0
+    # Apply fuzzy rules using priority, availability, and demand
+    rule1 = min(priority_high, availability_high)
+    rule2 = min(priority_high, availability_low)
+    rule3 = min(priority_medium, demand_low)
+    rule4 = min(priority_medium, demand_high)
+    rule5 = min(priority_low, demand_high)
+    rule6 = min(priority_low, demand_low)
 
-    elif priority >= 40:
-        percentage = 0.6
+    # Combine rules that recommend the same allocation level
+    high_allocation = max(rule1, rule3)
+    medium_allocation = max(rule2, rule4)
+    low_allocation = max(rule5, rule6)
 
-    else:
-        percentage = 0.3
+    # Calculate the total strength of the activated rules
+    total = high_allocation + medium_allocation + low_allocation
+
+    # Use a default percentage if no rules are activated
+    if total == 0:
+        return 0.5
+
+    # Calculate the final percentage using a weighted average
+    percentage = (
+        high_allocation * 1.0 +
+        medium_allocation * 0.6 +
+        low_allocation * 0.2
+    ) / total
+
+    return round(percentage, 2)
+
+
+# --------------------------------------------------
+# 4. RESOURCE ALLOCATION RECOMMENDATION
+# --------------------------------------------------
+
+# Suggest medicine, shelter, and nutrition allocations
+def suggest_allocation(required, available, priority, total_demand):
 
     suggested = []
 
+    # Calculate recommendations separately for each resource
     for i in range(3):
+
+        # Measure availability and demand for this resource
+        availability = availability_level(required[i], available[i])
+        demand = demand_level(total_demand[i], available[i])
+
+        # Get the fuzzy allocation percentage
+        percentage = fuzzy_allocation_percentage(
+            priority, availability, demand
+        )
+
+        # Calculate the recommended resource quantity
         amount = int(required[i] * percentage)
 
-        # Do not suggest more than available stock
+        # Do not allocate more than the available stock
         amount = min(amount, available[i])
 
         suggested.append(amount)
 
     return suggested
 
-# Explain the AI recommendation
-def explain_recommendation(priority):
 
-    if priority >= 70:
-        return "High priority: This request needs urgent attention. The AI recommends allocating as many required resources as available."
+# --------------------------------------------------
+# 5. TRANSPORT CAPACITY CHECKS
+# --------------------------------------------------
 
-    elif priority >= 40:
-        return "Medium priority: This request has moderate needs. The AI recommends allocating 60% of the required resources."
-
-    else:
-        return "Low priority: This request has lower relative priority. The AI recommends allocating 30% of the required resources."
-
-# Check whether the suggested allocation can be transported
+# Check if the recommendation fits the available transport
 def check_suggestion_transport(suggested, capacity, slots):
 
+    # A flight slot must be available
     if slots <= 0:
         return False
 
+    # The allocation must not exceed flight capacity
     if calculate_weight(suggested) > capacity:
         return False
 
     return True
 
+
+# Reduce the suggested quantities until they fit transport limits
+def adjust_for_transport(suggested, capacity, slots):
+
+    # No resources can be sent without transport availability
+    if slots <= 0 or capacity <= 0:
+        return [0, 0, 0]
+
+    # Copy the recommendation to avoid changing the original list
+    adjusted = suggested.copy()
+
+    # Keep reducing quantities while the weight exceeds capacity
+    while calculate_weight(adjusted) > capacity:
+
+        # Stop if there are no resources left to reduce
+        if all(amount == 0 for amount in adjusted):
+            break
+
+        # Reduce each resource quantity one unit at a time
+        for i in range(3):
+            if adjusted[i] > 0:
+                adjusted[i] -= 1
+
+    return adjusted
+
+
+# --------------------------------------------------
+# 6. AI RECOMMENDATION EXPLANATION
+# --------------------------------------------------
+
+# Generate a simple explanation of the AI recommendation
+def explain_recommendation(priority, required, suggested):
+
+    # Explain the request's expert priority
+    if priority == "Critical":
+        explanation = "This is a critical emergency request. "
+
+    elif priority == "High":
+        explanation = "This is a high-priority emergency request. "
+
+    elif priority == "Medium":
+        explanation = "This is a medium-priority emergency request. "
+
+    else:
+        explanation = "This is a low-priority emergency request. "
+
+    # Explain whether the AI recommends full or partial fulfilment
+    if suggested == required:
+        explanation += "The AI recommends fulfilling all requested resources."
+
+    elif all(amount == 0 for amount in suggested):
+        explanation += "The AI cannot recommend any resources under the current conditions."
+
+    else:
+        explanation += (
+            "The AI recommends a partial allocation based on "
+            "resource availability and competing demand."
+        )
+
+    return explanation

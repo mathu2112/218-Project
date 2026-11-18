@@ -1,135 +1,319 @@
-from fastapi import FastAPI
-from backend.load_data import load_data, get_requests
-from backend.game_rule import start_game, reset_game, end_game, allocate_request, can_allocate, get_game_state
-from backend.fuzzy_logic import calculate_priority, explain_recommendation, suggest_allocation, check_suggestion_transport
+import copy
+import random
 
-# Create the backend API
+from fastapi import FastAPI
+
+from backend.load_data import load_data, get_requests
+from backend.game_rule import (
+    check_request_fulfilment,
+    calculate_weight,
+    start_game,
+    reset_game,
+    end_game,
+    allocate_request,
+    can_allocate,
+    get_game_state,
+)
+from backend.fuzzy_logic import (
+    suggest_allocation,
+    explain_recommendation,
+    check_suggestion_transport,
+    adjust_for_transport,
+)
+
+
+# --------------------------------------------------
+# 1. BACKEND SETUP AND GAME DATA
+# --------------------------------------------------
+
 app = FastAPI()
 
+# Load the dataset once when the backend starts
+requests, locations, hubs, stock, flights = load_data()
 
-# Test whether the backend is running
+# Store player allocations and the current hub resources
+allocation_history = []
+hub_resources = {}
+original_hub_resources = {}
+
+# Choose a date that contains emergency requests
+available_dates = requests["request_datetime"].str[:10].dropna().unique().tolist()
+selected_date = random.choice(available_dates)
+
+
+# --------------------------------------------------
+# 2. GAME DATA HELPER FUNCTIONS
+# --------------------------------------------------
+
+def load_hub_resources():
+    # Load stock and flights for the current game date
+    daily_stock = stock[stock["date"] == selected_date]
+    daily_flights = flights[flights["date"] == selected_date]
+
+    # Clear resources from the previous game
+    hub_resources.clear()
+    original_hub_resources.clear()
+
+    for _, hub in daily_stock.iterrows():
+        hub_id = hub["hub_id"]
+
+        # Find the matching flight data for this hub
+        hub_flight = daily_flights[daily_flights["hub_id"] == hub_id]
+        if hub_flight.empty:
+            continue
+
+        hub_flight = hub_flight.iloc[0]
+
+        # Save the stock and transport limits
+        hub_resources[hub_id] = {
+            "stock": [
+                int(hub["medicine_stock_kits"]),
+                int(hub["shelter_stock_kits"]),
+                int(hub["nutrition_stock_parcels"]),
+            ],
+            "capacity": float(hub_flight["total_capacity_tonnes"]),
+            "slots": int(hub_flight["flight_slots_available"]),
+        }
+
+    # Keep the original values for AI simulation and resets
+    original_hub_resources.update(copy.deepcopy(hub_resources))
+
+
+def get_daily_requests():
+    # Return only requests from the selected date
+    return requests[
+        requests["request_datetime"].str[:10] == selected_date
+    ].copy()
+
+
+def get_total_demand(hub_id):
+    # Find all requests assigned to the same hub
+    daily_requests = get_daily_requests()
+    hub_requests = daily_requests[daily_requests["supply_hub"] == hub_id]
+
+    # Total demand for medicine, shelter, and nutrition
+    return [
+        int(hub_requests["medicine_required_kits"].fillna(0).sum()),
+        int(hub_requests["shelter_required_kits"].fillna(0).sum()),
+        int(hub_requests["nutrition_required_parcels"].fillna(0).sum()),
+    ]
+
+
+def get_ai_resources():
+    # Give the AI its own copy of the starting resources
+    return copy.deepcopy(original_hub_resources)
+
+
+def get_sorted_requests():
+    # Process Critical requests before High, Medium, and Low
+    daily_requests = get_daily_requests()
+    priority_order = {"Critical": 1, "High": 2, "Medium": 3, "Low": 4}
+
+    daily_requests["priority_order"] = (
+        daily_requests["expert_priority_label"].map(priority_order)
+    )
+
+    # Use request time to break ties within the same priority
+    return daily_requests.sort_values(
+        by=["priority_order", "request_datetime"],
+        na_position="last",
+    )
+
+
+# Load resources for the first randomly selected date
+load_hub_resources()
+
+
+# --------------------------------------------------
+# 3. INDEPENDENT AI SIMULATION
+# --------------------------------------------------
+
+def simulate_ai():
+    # The AI must not change the player's resources
+    ai_resources = get_ai_resources()
+    ai_history = []
+
+    # Allocate resources to requests in priority order
+    for _, request in get_sorted_requests().iterrows():
+        hub_id = request["supply_hub"]
+
+        required = [
+            int(request["medicine_required_kits"]),
+            int(request["shelter_required_kits"]),
+            int(request["nutrition_required_parcels"]),
+        ]
+        priority = request["expert_priority_label"]
+
+        # Record requests with missing hub data as unfulfilled
+        if hub_id not in ai_resources:
+            ai_history.append({
+                "request_id": request["request_id"],
+                "supply_hub": hub_id,
+                "expert_priority_label": priority,
+                "medicine_allocated": 0,
+                "shelter_allocated": 0,
+                "nutrition_allocated": 0,
+                "status": "Unfulfilled",
+            })
+            continue
+
+        # Use the AI's remaining resources for this hub
+        resources = ai_resources[hub_id]
+
+        # Use fuzzy logic to recommend quantities for this request
+        suggested = suggest_allocation(
+            required,
+            resources["stock"],
+            priority,
+            get_total_demand(hub_id),
+        )
+
+        # Reduce quantities if transport capacity is limited
+        suggested = adjust_for_transport(
+            suggested,
+            resources["capacity"],
+            resources["slots"],
+        )
+
+        # Only use stock and a flight slot when something is sent
+        if resources["slots"] > 0 and any(amount > 0 for amount in suggested):
+            for i in range(3):
+                resources["stock"][i] -= suggested[i]
+
+            resources["capacity"] -= calculate_weight(suggested)
+            resources["slots"] -= 1
+
+        # Record the outcome for evaluation
+        status = check_request_fulfilment(required, suggested)
+        ai_history.append({
+            "request_id": request["request_id"],
+            "supply_hub": hub_id,
+            "expert_priority_label": priority,
+            "medicine_allocated": suggested[0],
+            "shelter_allocated": suggested[1],
+            "nutrition_allocated": suggested[2],
+            "status": status,
+        })
+
+    return ai_history
+
+
+# --------------------------------------------------
+# 4. GENERAL GAME ENDPOINTS
+# --------------------------------------------------
+
 @app.get("/")
 def home():
+    # Check that the backend is running
     return {"message": "Gaza Humanitarian Air Bridge Backend is running"}
 
 
-# Load emergency requests
-requests, locations, hubs, stock, flights = load_data()
-# Store the player's successful allocations
-allocation_history = []
-# Store available resources for each supply hub
-hub_resources = {}
-# Save the original hub resources for resetting
-original_hub_resources = {}
-# Choose the date for the game
-selected_date = "2025-10-01"
+@app.get("/game-date")
+def show_game_date():
+    return {"selected_date": selected_date}
 
-# Get stock and flights for the selected date
-daily_stock = stock[stock["date"] == selected_date]
-daily_flights = flights[flights["date"] == selected_date]
 
-# Store each hub's resources
-for _, hub in daily_stock.iterrows():
+@app.get("/game-status")
+def show_game_status():
+    return {"game_state": get_game_state()}
 
-    hub_id = hub["hub_id"]
 
-    hub_flight = daily_flights[daily_flights["hub_id"] == hub_id]
-
-    if hub_flight.empty:
-        continue
-
-    hub_flight = hub_flight.iloc[0]
-
-    hub_resources[hub_id] = {
-        "stock": [
-            int(hub["medicine_stock_kits"]),
-            int(hub["shelter_stock_kits"]),
-            int(hub["nutrition_stock_parcels"])
-        ],
-        "capacity": float(hub_flight["total_capacity_tonnes"]),
-        "slots": int(hub_flight["flight_slots_available"])
-    }
-# Keep a separate copy of the starting resources
-for hub_id in hub_resources:
-    original_hub_resources[hub_id] = {
-        "stock": hub_resources[hub_id]["stock"].copy(),
-        "capacity": hub_resources[hub_id]["capacity"],
-        "slots": hub_resources[hub_id]["slots"]
-    }
-
-# Send emergency requests for the selected game date
 @app.get("/requests")
 def show_requests():
-
-    # Get only requests for the current game date
-    daily_requests = requests[
-        requests["request_datetime"].str[:10] == selected_date
-    ]
-
-    request_data = get_requests(daily_requests)
-
+    # Send the current day's requests to the frontend
+    request_data = get_requests(get_daily_requests())
     return request_data.fillna("").to_dict(orient="records")
 
-# Send current available resources to the frontend
+
 @app.get("/resources")
 def show_resources():
+    # Send the player's remaining hub resources
     return hub_resources
-    
-    
-# Start the game
+
+
 @app.post("/start")
 def start():
-
+    # A completed game must be reset before starting again
     if get_game_state() == "COMPLETE":
         return {"error": "Game is complete. Reset before starting again"}
 
-    state = start_game()
-    return {"game_state": state}
+    return {"game_state": start_game()}
 
-# Get AI recommendation for a request
+
+@app.post("/reset")
+def reset():
+    global selected_date
+
+    # Clear previous allocations and return to READY
+    state = reset_game()
+    allocation_history.clear()
+
+    # Select a new scenario and load its resources
+    selected_date = random.choice(available_dates)
+    load_hub_resources()
+
+    return {"game_state": state, "selected_date": selected_date}
+
+
+@app.post("/finish")
+def finish():
+    return {"game_state": end_game()}
+
+
+# --------------------------------------------------
+# 5. FUZZY AI RECOMMENDATION ENDPOINT
+# --------------------------------------------------
+
 @app.get("/recommendation/{request_id}")
 def get_recommendation(request_id: str):
-
+    # Find the requested emergency
     matching = requests[requests["request_id"] == request_id]
-
     if matching.empty:
         return {"error": "Request not found"}
 
     request = matching.iloc[0]
     hub_id = request["supply_hub"]
-
-    priority = calculate_priority(
-        request["urgency_level"],
-        request["severity_level"],
-        request["population_affected"]
-    )
-
-    explanation = explain_recommendation(priority)
+    priority = request["expert_priority_label"]
 
     required = [
         int(request["medicine_required_kits"]),
         int(request["shelter_required_kits"]),
-        int(request["nutrition_required_parcels"])
+        int(request["nutrition_required_parcels"]),
     ]
 
-    # Check that the request belongs to the current game date
+    # Only recommend for the selected game's requests
     request_date = str(request["request_datetime"])[:10]
-
     if request_date != selected_date:
         return {"error": "Request is not for the selected game date"}
 
-    # Get the remaining stock from the hub
     if hub_id not in hub_resources:
         return {"error": "Supply hub not found"}
 
-    available = hub_resources[hub_id]["stock"]
+    resources = hub_resources[hub_id]
 
-    suggested = suggest_allocation(required, available, priority)
-    # Get the remaining flight capacity and slots
-    capacity = hub_resources[hub_id]["capacity"]
-    slots = hub_resources[hub_id]["slots"]
+    # Calculate the fuzzy recommendation using remaining player stock
+    suggested = suggest_allocation(
+        required,
+        resources["stock"],
+        priority,
+        get_total_demand(hub_id),
+    )
+
+    # Fit the recommendation within transport limits
+    suggested = adjust_for_transport(
+        suggested,
+        resources["capacity"],
+        resources["slots"],
+    )
+
+    # Explain the final recommended quantities
+    explanation = explain_recommendation(priority, required, suggested)
+
+    # Check whether transport is available
+    capacity = resources["capacity"]
+    slots = resources["slots"]
     transport_ok = check_suggestion_transport(suggested, capacity, slots)
-    # Explain transport availability
+
     if slots <= 0:
         transport_message = "No flight slots are available."
     elif not transport_ok:
@@ -137,119 +321,115 @@ def get_recommendation(request_id: str):
     else:
         transport_message = "Transport is available."
 
-
     return {
         "request_id": request_id,
         "supply_hub": hub_id,
-        "priority_score": priority,
+        "expert_priority_label": priority,
         "transport_available": transport_ok,
         "transport_message": transport_message,
         "explanation": explanation,
         "suggested_allocation": {
             "medicine": suggested[0],
             "shelter": suggested[1],
-            "nutrition": suggested[2]
-        }
+            "nutrition": suggested[2],
+        },
     }
-    
-# Reset the game
-@app.post("/reset")
-def reset():
-    state = reset_game()
-    allocation_history.clear()
 
-    hub_resources.clear()
 
-    for hub_id in original_hub_resources:
-        hub_resources[hub_id] = {
-            "stock": original_hub_resources[hub_id]["stock"].copy(),
-            "capacity": original_hub_resources[hub_id]["capacity"],
-            "slots": original_hub_resources[hub_id]["slots"]
-        }
+# --------------------------------------------------
+# 6. PLAYER ALLOCATION ENDPOINT
+# --------------------------------------------------
 
-    return {"game_state": state}
-
-# Finish the game
-@app.post("/finish")
-def finish():
-    state = end_game()
-    return {"game_state": state}
-
-# Receive the player's allocation
 @app.post("/allocate")
 def allocate(data: dict):
-
-    # Only allow allocations while the game is running
+    # Only allow allocations after the game starts
     if not can_allocate():
         return {"error": "Start the game before allocating resources"}
 
-    request_id = data["request_id"]
+    # Check that the request ID was provided
+    request_id = data.get("request_id")
+    if not request_id:
+        return {"error": "Request ID is required"}
+
+    # Check that all three resource quantities were provided
+    if any(key not in data for key in ("medicine", "shelter", "nutrition")):
+        return {"error": "Medicine, shelter and nutrition quantities are required"}
 
     allocated = [
         int(data["medicine"]),
         int(data["shelter"]),
-        int(data["nutrition"])
+        int(data["nutrition"]),
     ]
-    # Prevent allocations with no supplies
+
+    # Reject empty or negative allocations
     if allocated == [0, 0, 0]:
         return {"error": "You must allocate at least one resource"}
 
-    # Prevent negative resource quantities
     if any(amount < 0 for amount in allocated):
         return {"error": "Resource quantities cannot be negative"}
 
+    # Find the request in the dataset
     matching = requests[requests["request_id"] == request_id]
-
     if matching.empty:
         return {"error": "Request not found"}
 
-    # Prevent allocating the same request twice
+    # A request can only be allocated once
     for record in allocation_history:
         if record["request_id"] == request_id:
             return {"error": "This request has already been allocated"}
 
     request = matching.iloc[0].to_dict()
 
-    # Check that the request belongs to the selected game date
+    # Only accept requests from the current game date
     request_date = str(request["request_datetime"])[:10]
-
     if request_date != selected_date:
         return {"error": "Request is not for the selected game date"}
 
     if request["supply_hub"] not in hub_resources:
         return {"error": "Supply hub not found"}
 
+    # Apply game rules and save the player's allocation
     status = allocate_request(
         request,
         allocated,
         hub_resources,
-        allocation_history
+        allocation_history,
     )
 
+    if status == "Allocation Failed":
+        return {
+            "error": "Allocation failed due to insufficient resources or transport capacity"
+        }
+
+    return {"request_id": request_id, "status": status}
+
+
+# --------------------------------------------------
+# 7. RESULTS ENDPOINTS
+# --------------------------------------------------
+
+@app.get("/ai-results")
+def get_ai_results():
+    # Run the independent AI simulation for the selected date
+    ai_results = simulate_ai()
     return {
-        "request_id": request_id,
-        "status": status
+        "selected_date": selected_date,
+        "total_requests": len(get_sorted_requests()),
+        "total_ai_results": len(ai_results),
+        "ai_allocations": ai_results,
     }
-    
-# Send allocation results to the frontend
+
+
 @app.get("/results")
 def show_results():
+    # Return the player's recorded allocations
     return {
         "total_allocations": len(allocation_history),
-        "allocations": allocation_history
+        "allocations": allocation_history,
     }
-    
-# Temporary test to check remaining hub resources
+
+
 @app.get("/hub-resources")
 def show_hub_resources():
+    # Extra endpoint for checking the player's remaining resources
     return hub_resources
-
-# Send the current game state to the frontend
-@app.get("/game-status")
-def show_game_status():
-    return {"game_state": get_game_state()}
-
-# Send the selected game date to the frontend
-@app.get("/game-date")
-def show_game_date():
-    return {"selected_date": selected_date}

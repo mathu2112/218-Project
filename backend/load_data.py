@@ -24,6 +24,7 @@ def get_requests(requests):
         "medicine_required_kits",
         "shelter_required_kits",
         "nutrition_required_parcels",
+        "expert_priority_label",
         "urgency_level",
         "severity_level",
         "medical_emergency",
