@@ -3,6 +3,7 @@ import random
 
 from fastapi import FastAPI
 
+from backend.evaluation.experiments import run_current_backend_evaluation, compare_strategies
 from backend.load_data import load_data, get_requests
 from backend.game_rule import (
     check_request_fulfilment,
@@ -433,3 +434,63 @@ def show_results():
 def show_hub_resources():
     # Extra endpoint for checking the player's remaining resources
     return hub_resources
+
+
+# --------------------------------------------------
+# 8. EVALUATION OF AI AND PLAYER DECISIONS
+# --------------------------------------------------
+
+def prepare_evaluation_allocations(history):
+    """Combine all current requests with a strategy's recorded allocations."""
+    recorded = {record["request_id"]: record for record in history}
+    evaluated = []
+
+    for _, request in get_daily_requests().iterrows():
+        request_id = request["request_id"]
+        allocation = recorded.get(request_id, {})
+        evaluated.append({
+            "request_id": request_id,
+            "supply_hub": request["supply_hub"],
+            "expert_priority_label": request["expert_priority_label"],
+            "urgency_level": request["urgency_level"],
+            "severity_level": request["severity_level"],
+            "medicine_required_kits": int(request["medicine_required_kits"]),
+            "shelter_required_kits": int(request["shelter_required_kits"]),
+            "nutrition_required_parcels": int(request["nutrition_required_parcels"]),
+            "medicine_allocated": int(allocation.get("medicine_allocated", 0)),
+            "shelter_allocated": int(allocation.get("shelter_allocated", 0)),
+            "nutrition_allocated": int(allocation.get("nutrition_allocated", 0)),
+        })
+
+    return evaluated
+
+
+def get_initial_stock_totals():
+    """Use the same starting stock when evaluating both strategies."""
+    totals = {"medicine": 0, "shelter": 0, "nutrition": 0}
+    for resources in original_hub_resources.values():
+        totals["medicine"] += resources["stock"][0]
+        totals["shelter"] += resources["stock"][1]
+        totals["nutrition"] += resources["stock"][2]
+    return totals
+
+
+@app.get("/evaluation")
+def get_evaluation():
+    """Compare AI and player allocations for the selected game date."""
+    ai_allocations = prepare_evaluation_allocations(simulate_ai())
+    player_allocations = prepare_evaluation_allocations(allocation_history)
+    results = run_current_backend_evaluation(
+        ai_allocations=ai_allocations,
+        human_allocations=player_allocations,
+        available_stock=get_initial_stock_totals(),
+        scenario_name=selected_date,
+    )
+    return {
+        "selected_date": selected_date,
+        "game_state": get_game_state(),
+        "total_requests": len(ai_allocations),
+        "player_allocations_completed": len(allocation_history),
+        "comparison": compare_strategies(results),
+        "detailed_results": results,
+    }
