@@ -2,542 +2,425 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resource Allocation | Humanitarian Air Bridge</title>
-    <link rel="stylesheet" href="style.css">
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            color: #e8f4ff;
-            font-family: Arial, sans-serif;
-            background:
-                linear-gradient(
-                    rgba(0,210,235,.035) 1px,
-                    transparent 1px
-                ),
-                linear-gradient(
-                    90deg,
-                    rgba(0,210,235,.035) 1px,
-                    transparent 1px
-                ),
-                radial-gradient(
-                    ellipse at 85% 0%,
-                    #12354a,
-                    #071529 45%,
-                    #030b1d
-                );
-            background-size: 55px 55px, 55px 55px, cover;
-            background-attachment: fixed;
-        }
-
-        /* HEADER */
-
-        .game-header {
-            background: rgba(4,17,36,.95);
-            border-bottom: 1px solid rgba(0,219,234,.25);
-            padding: 24px 7%;
-            text-align: left;
-        }
-
-        .game-header h1 {
-            margin: 0;
-            color: #40e8f3;
-            font-size: 29px;
-            text-shadow: 0 0 20px rgba(0,225,240,.3);
-        }
-
-        .game-header p {
-            margin: 8px 0 0;
-            color: #91aebf;
-            font-size: 13px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        /* NAVIGATION */
-
-        .game-nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 16px 7%;
-            background: rgba(4,17,36,.75);
-            border-bottom: 1px solid rgba(0,219,234,.12);
-        }
-
-        .game-nav a {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 18px;
-            border: 1px solid transparent;
-            border-radius: 10px;
-            color: #a9c5d5;
-            text-decoration: none;
-            font-size: 15px;
-            transition: .25s ease;
-        }
-
-        .game-nav a:hover,
-        .game-nav a.active {
-            color: #40e8f3;
-            background: rgba(0,219,234,.09);
-            border-color: rgba(0,219,234,.45);
-        }
-
-        .nav-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 22px;
-            height: 22px;
-            font-size: 19px;
-        }
-
-        /* LIVE RESOURCE BAR */
-
-        .resource-dashboard {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: rgba(3, 11, 29, .97);
-            border-bottom: 1px solid #1c3d55;
-            padding: 17px 5%;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 8px 30px rgba(0,0,0,.25);
-        }
-
-        .resource-dashboard-inner {
-            max-width: 1350px;
-            margin: auto;
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 28px;
-        }
-
-        .stock-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 0;
-        }
-
-        .stock-icon {
-            width: 42px;
-            height: 42px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 13px;
-            font-size: 20px;
-        }
-
-        .medicine-icon {
-            color: #ff4d83;
-            background: rgba(255,77,131,.13);
-        }
-
-        .shelter-icon {
-            color: #ffa64d;
-            background: rgba(255,166,77,.13);
-        }
-
-        .nutrition-icon {
-            color: #8bef61;
-            background: rgba(139,239,97,.13);
-        }
-
-        .stock-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .stock-heading {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 9px;
-        }
-
-        .stock-label {
-            color: #9db2c6;
-            font-size: 13px;
-            letter-spacing: .6px;
-        }
-
-        .stock-number {
-            color: #f0f7ff;
-            font-weight: bold;
-            font-size: 16px;
-            white-space: nowrap;
-        }
-
-        .stock-track {
-            height: 9px;
-            border-radius: 20px;
-            background: #07172b;
-            border: 1px solid #1c344e;
-            overflow: hidden;
-        }
-
-        .stock-fill {
-            height: 100%;
-            width: 100%;
-            border-radius: 20px;
-            transition: width .25s ease;
-        }
-
-        #medicineBar {
-            background: #ff4d83;
-            box-shadow: 0 0 12px rgba(255,77,131,.35);
-        }
-
-        #shelterBar {
-            background: #ffa64d;
-            box-shadow: 0 0 12px rgba(255,166,77,.35);
-        }
-
-        #nutritionBar {
-            background: #8bef61;
-            box-shadow: 0 0 12px rgba(139,239,97,.35);
-        }
-
-        /* MAIN PAGE */
-
-        .game-container {
-            max-width: 1250px;
-            margin: auto;
-            padding: 45px 28px 70px;
-        }
-
-        .game-title {
-            margin: 0 0 15px;
-            color: #40e8f3;
-            font-size: clamp(30px, 4vw, 46px);
-            text-shadow: 0 0 24px rgba(0,225,240,.25);
-        }
-
-        .game-subtitle {
-            color: #a9bfd1;
-            font-size: 16px;
-            line-height: 1.8;
-            margin-bottom: 30px;
-        }
-
-        .allocation-section,
-        .ai-panel {
-            background: linear-gradient(135deg, #0e2a42, #081a30);
-            border: 1px solid rgba(0,219,234,.28);
-            border-radius: 18px;
-            padding: 28px;
-            margin-bottom: 25px;
-            box-shadow: 0 0 30px rgba(0,219,234,.05);
-        }
-
-        .allocation-section h2,
-        .ai-panel h2 {
-            color: #40e8f3;
-            margin-top: 0;
-            font-size: 23px;
-        }
-
-        .info-text {
-            color: #b8cede;
-            line-height: 1.8;
-        }
-
-        /* SUMMARY */
-
-        .game-stats {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 20px;
-            margin: 28px 0;
-        }
-
-        .stat-card {
-            background: linear-gradient(145deg, #0d2840, #091a31);
-            border: 1px solid rgba(0,219,234,.24);
-            border-radius: 17px;
-            padding: 25px;
-        }
-
-        .stat-card h3 {
-            color: #a9c5d5;
-            font-size: 15px;
-            font-weight: normal;
-            margin: 0 0 16px;
-        }
-
-        .stat-card strong {
-            color: #40e8f3;
-            font-size: 34px;
-        }
-
-        .stat-unit {
-            color: #91aebf;
-            font-size: 13px;
-            margin: 8px 0 0;
-        }
-
-        /* HUB */
-
-        .hub-display {
-            background: #091e32;
-            border: 1px solid #28566a;
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 18px;
-        }
-
-        .hub-name {
-            color: #40e8f3;
-            font-size: 22px;
-            font-weight: bold;
-        }
-
-        .hub-note {
-            color: #9cb7c9;
-            font-size: 14px;
-            margin-bottom: 0;
-        }
-
-        /* RESOURCE INPUTS */
-
-        .allocation-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 20px;
-            margin-top: 22px;
-        }
-
-        .resource-card {
-            background: linear-gradient(150deg, #102c45, #091a31);
-            border: 1px solid #234960;
-            border-radius: 16px;
-            padding: 24px;
-            transition: .25s ease;
-        }
-
-        .resource-card:hover {
-            transform: translateY(-4px);
-            border-color: #00dbea;
-            box-shadow: 0 0 25px rgba(0,219,234,.12);
-        }
-
-        .resource-card label {
-            display: block;
-            color: #f4fbff;
-            font-size: 21px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-
-        .resource-card p {
-            color: #b8cede;
-        }
-
-        .resource-card strong {
-            color: #40e8f3;
-        }
-
-        .resource-card input {
-            width: 100%;
-            padding: 13px;
-            margin-top: 12px;
-            background: #06182b;
-            border: 1px solid #2d6075;
-            border-radius: 10px;
-            color: #e8f4ff;
-            font-size: 17px;
-            outline: none;
-        }
-
-        .resource-card input:focus {
-            border-color: #00dbea;
-            box-shadow: 0 0 15px rgba(0,219,234,.2);
-        }
-
-        /* FLIGHT WEIGHT */
-
-        .weight-display {
-            background: #071b30;
-            border: 1px solid #28566a;
-            border-radius: 14px;
-            padding: 22px;
-            margin-top: 20px;
-        }
-
-        .weight-heading {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
-        }
-
-        .weight-heading strong {
-            color: #40e8f3;
-        }
-
-        .weight-track {
-            height: 15px;
-            background: #061323;
-            border: 1px solid #28566a;
-            border-radius: 20px;
-            overflow: hidden;
-        }
-
-        .weight-fill {
-            width: 0%;
-            height: 100%;
-            border-radius: 20px;
-            background: linear-gradient(90deg, #087d95, #40e8f3);
-            transition: width .25s ease;
-        }
-
-        .weight-fill.over-limit {
-            background: linear-gradient(90deg, #c43b50, #ff687a);
-        }
-
-        .weight-warning {
-            margin-top: 13px;
-            color: #9cb7c9;
-            font-size: 14px;
-        }
-
-        .weight-warning.error {
-            color: #ff8b9a;
-        }
-
-        /* AI */
-
-        .ai-panel {
-            border-color: rgba(0,219,234,.45);
-        }
-
-        .ai-panel p {
-            color: #c2d8e6;
-            line-height: 1.8;
-        }
-
-        .ai-label {
-            color: #7bc9dc;
-            font-size: 12px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        /* BUTTONS */
-
-        .game-button {
-            display: inline-block;
-            background: linear-gradient(110deg, #073b50, #0b2b40);
-            color: #40e8f3;
-            border: 1px solid #00dbea;
-            padding: 13px 20px;
-            border-radius: 11px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            transition: .25s ease;
-            margin: 8px 8px 8px 0;
-        }
-
-        .game-button:hover:not(:disabled) {
-            background: #00dbea;
-            color: #031020;
-            transform: translateY(-2px);
-            box-shadow: 0 0 25px rgba(0,219,234,.35);
-        }
-
-        .game-button.success {
-            background: linear-gradient(110deg, #075565, #073b50);
-        }
-
-        #viewResultsButton {
-            display: none;
-            margin-top: 20px;
-            background: linear-gradient(110deg, #087d95, #00dbea);
-            color: #031020;
-            border: 1px solid #40e8f3;
-            box-shadow: 0 0 20px rgba(0,219,234,.2);
-        }
-
-        #viewResultsButton:hover {
-            background: #40e8f3;
-            box-shadow: 0 0 30px rgba(0,219,234,.45);
-        }
-
-        /* FEEDBACK */
-
-        .feedback {
-            margin-top: 18px;
-            padding: 16px;
-            border-radius: 11px;
-            background: #091e32;
-            color: #b8cede;
-            line-height: 1.7;
-            border: 1px solid #28566a;
-        }
-
-        .feedback.error {
-            border-color: #ff687a;
-            color: #ffb6bf;
-            background: rgba(255,70,90,.08);
-        }
-
-        .feedback.success-message {
-            border-color: #40d6a0;
-            color: #b6ffe0;
-            background: rgba(64,214,160,.08);
-        }
-
-        @media (max-width: 900px) {
-            .resource-dashboard-inner {
-                gap: 14px;
-            }
-
-            .stock-label {
-                font-size: 11px;
-            }
-
-            .allocation-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 650px) {
-            .game-header,
-            .game-nav {
-                padding-left: 20px;
-                padding-right: 20px;
-            }
-
-            .resource-dashboard {
-                position: static;
-                padding: 16px 20px;
-            }
-
-            .resource-dashboard-inner,
-            .game-stats,
-            .allocation-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .game-container {
-                padding: 30px 18px;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resource Allocation | Humanitarian Air Bridge</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    color: #e8f4ff;
+    font-family: Arial, sans-serif;
+    background:
+        linear-gradient(rgba(0,210,235,.035) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,210,235,.035) 1px,transparent 1px),
+        radial-gradient(ellipse at 85% 0%,#12354a,#071529 45%,#030b1d);
+    background-size: 55px 55px,55px 55px,cover;
+    background-attachment: fixed;
+}
+
+.game-header {
+    background: rgba(4,17,36,.95);
+    border-bottom: 1px solid rgba(0,219,234,.25);
+    padding: 24px 7%;
+}
+.game-header h1 {
+    margin: 0;
+    color: #40e8f3;
+    font-size: 29px;
+    text-shadow: 0 0 20px rgba(0,225,240,.3);
+}
+.game-header p {
+    margin: 8px 0 0;
+    color: #91aebf;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+.game-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 7%;
+    background: rgba(4,17,36,.75);
+    border-bottom: 1px solid rgba(0,219,234,.12);
+}
+.game-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: #a9c5d5;
+    text-decoration: none;
+    font-size: 15px;
+    transition: .25s ease;
+}
+.game-nav a:hover,
+.game-nav a.active {
+    color: #40e8f3;
+    background: rgba(0,219,234,.09);
+    border-color: rgba(0,219,234,.45);
+}
+.nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 19px;
+}
+
+/* LIVE STOCK DASHBOARD */
+.resource-dashboard {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(3,11,29,.97);
+    border-bottom: 1px solid #1c3d55;
+    padding: 17px 5%;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 8px 30px rgba(0,0,0,.25);
+}
+.resource-dashboard-inner {
+    max-width: 1350px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 28px;
+}
+.stock-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.stock-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    font-size: 20px;
+}
+.medicine-icon {
+    color: #ff4d83;
+    background: rgba(255,77,131,.13);
+}
+.shelter-icon {
+    color: #ffa64d;
+    background: rgba(255,166,77,.13);
+}
+.nutrition-icon {
+    color: #8bef61;
+    background: rgba(139,239,97,.13);
+}
+.stock-info { flex: 1; min-width: 0; }
+.stock-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 9px;
+}
+.stock-label {
+    color: #9db2c6;
+    font-size: 13px;
+    letter-spacing: .6px;
+}
+.stock-number {
+    color: #f0f7ff;
+    font-weight: bold;
+    font-size: 16px;
+    white-space: nowrap;
+}
+.stock-track {
+    height: 9px;
+    border-radius: 20px;
+    background: #07172b;
+    border: 1px solid #1c344e;
+    overflow: hidden;
+}
+.stock-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 20px;
+    transition: width .25s ease;
+}
+#medicineBar { background: #ff4d83; }
+#shelterBar { background: #ffa64d; }
+#nutritionBar { background: #8bef61; }
+
+/* MAIN CONTENT */
+.game-container {
+    max-width: 1250px;
+    margin: auto;
+    padding: 45px 28px 70px;
+}
+.game-title {
+    margin: 0 0 15px;
+    color: #40e8f3;
+    font-size: clamp(30px,4vw,46px);
+    text-shadow: 0 0 24px rgba(0,225,240,.25);
+}
+.game-subtitle {
+    color: #a9bfd1;
+    font-size: 16px;
+    line-height: 1.8;
+    margin-bottom: 30px;
+}
+.allocation-section,
+.ai-panel {
+    background: linear-gradient(135deg,#0e2a42,#081a30);
+    border: 1px solid rgba(0,219,234,.28);
+    border-radius: 18px;
+    padding: 28px;
+    margin-bottom: 25px;
+    box-shadow: 0 0 30px rgba(0,219,234,.05);
+}
+.allocation-section h2,
+.ai-panel h2 {
+    color: #40e8f3;
+    margin-top: 0;
+    font-size: 23px;
+}
+.info-text {
+    color: #b8cede;
+    line-height: 1.8;
+}
+
+/* SUMMARY CARDS */
+.game-stats {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 20px;
+    margin: 28px 0;
+}
+.stat-card {
+    background: linear-gradient(145deg,#0d2840,#091a31);
+    border: 1px solid rgba(0,219,234,.24);
+    border-radius: 17px;
+    padding: 25px;
+}
+.stat-card h3 {
+    color: #a9c5d5;
+    font-size: 15px;
+    font-weight: normal;
+    margin: 0 0 16px;
+}
+.stat-card strong {
+    color: #40e8f3;
+    font-size: 34px;
+}
+.stat-unit {
+    color: #91aebf;
+    font-size: 13px;
+    margin: 8px 0 0;
+}
+
+/* ASSIGNED HUB */
+.hub-display {
+    background: #091e32;
+    border: 1px solid #28566a;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 18px;
+}
+.hub-name {
+    color: #40e8f3;
+    font-size: 22px;
+    font-weight: bold;
+}
+.hub-note {
+    color: #9cb7c9;
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
+/* RESOURCE INPUTS */
+.allocation-grid {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 20px;
+    margin-top: 22px;
+}
+.resource-card {
+    background: linear-gradient(150deg,#102c45,#091a31);
+    border: 1px solid #234960;
+    border-radius: 16px;
+    padding: 24px;
+    transition: .25s ease;
+}
+.resource-card:hover {
+    transform: translateY(-4px);
+    border-color: #00dbea;
+    box-shadow: 0 0 25px rgba(0,219,234,.12);
+}
+.resource-card label {
+    display: block;
+    color: #f4fbff;
+    font-size: 21px;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+.resource-card p { color: #b8cede; }
+.resource-card strong { color: #40e8f3; }
+.resource-card input {
+    width: 100%;
+    padding: 13px;
+    margin-top: 12px;
+    background: #06182b;
+    border: 1px solid #2d6075;
+    border-radius: 10px;
+    color: #e8f4ff;
+    font-size: 17px;
+    outline: none;
+}
+.resource-card input:focus {
+    border-color: #00dbea;
+    box-shadow: 0 0 15px rgba(0,219,234,.2);
+}
+
+/* FLIGHT CAPACITY */
+.weight-display {
+    background: #071b30;
+    border: 1px solid #28566a;
+    border-radius: 14px;
+    padding: 22px;
+    margin-top: 20px;
+}
+.weight-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+.weight-heading strong { color: #40e8f3; }
+.weight-track {
+    height: 15px;
+    background: #061323;
+    border: 1px solid #28566a;
+    border-radius: 20px;
+    overflow: hidden;
+}
+.weight-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: 20px;
+    background: linear-gradient(90deg,#087d95,#40e8f3);
+    transition: width .25s ease;
+}
+.weight-fill.over-limit {
+    background: linear-gradient(90deg,#c43b50,#ff687a);
+}
+.weight-warning {
+    margin-top: 13px;
+    color: #9cb7c9;
+    font-size: 14px;
+}
+.weight-warning.error { color: #ff8b9a; }
+
+/* AI ADVISOR */
+.ai-panel { border-color: rgba(0,219,234,.45); }
+.ai-panel p {
+    color: #c2d8e6;
+    line-height: 1.8;
+}
+.ai-label {
+    color: #7bc9dc;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* BUTTONS */
+.game-button {
+    display: inline-block;
+    background: linear-gradient(110deg,#073b50,#0b2b40);
+    color: #40e8f3;
+    border: 1px solid #00dbea;
+    padding: 13px 20px;
+    border-radius: 11px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: none;
+    transition: .25s ease;
+    margin: 8px 8px 8px 0;
+}
+.game-button:hover:not(:disabled) {
+    background: #00dbea;
+    color: #031020;
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0,219,234,.35);
+}
+.game-button.success {
+    background: linear-gradient(110deg,#075565,#073b50);
+}
+.game-button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+#viewResultsButton {
+    display: none;
+    margin-top: 20px;
+    background: linear-gradient(110deg,#087d95,#00dbea);
+    color: #031020;
+    border: 1px solid #40e8f3;
+}
+
+/* FEEDBACK */
+.feedback {
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 11px;
+    background: #091e32;
+    color: #b8cede;
+    line-height: 1.7;
+    border: 1px solid #28566a;
+}
+.feedback.error {
+    border-color: #ff687a;
+    color: #ffb6bf;
+    background: rgba(255,70,90,.08);
+}
+.feedback.success-message {
+    border-color: #40d6a0;
+    color: #b6ffe0;
+    background: rgba(64,214,160,.08);
+}
+
+@media (max-width: 900px) {
+    .resource-dashboard-inner { gap: 14px; }
+    .stock-label { font-size: 11px; }
+    .allocation-grid {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+}
+@media (max-width: 650px) {
+    .game-header,
+    .game-nav {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    .resource-dashboard {
+        position: static;
+        padding: 16px 20px;
+    }
+    .resource-dashboard-inner,
+    .game-stats,
+    .allocation-grid {
+        grid-template-columns: 1fr;
+    }
+    .game-container { padding: 30px 18px; }
+}
+</style>
 </head>
 
 <body>
@@ -551,36 +434,28 @@
     <a href="home.html">
         <span class="nav-icon">🏠</span> Home
     </a>
-
     <a href="requests.html">
         <span class="nav-icon">🚨</span> Emergency Requests
     </a>
-
     <a href="allocation.html" class="active">
         <span class="nav-icon">📦</span> Resource Allocation
     </a>
-
     <a href="results.html">
         <span class="nav-icon">📊</span> Simulation Results
     </a>
 </nav>
 
 <!-- LIVE STOCK DASHBOARD -->
-
 <section class="resource-dashboard">
     <div class="resource-dashboard-inner">
 
         <div class="stock-item">
             <div class="stock-icon medicine-icon">💗</div>
-
             <div class="stock-info">
                 <div class="stock-heading">
                     <span class="stock-label">MEDICINE LEFT</span>
-                    <span class="stock-number" id="medicineRemaining">
-                        0/0
-                    </span>
+                    <span class="stock-number" id="medicineRemaining">0/0</span>
                 </div>
-
                 <div class="stock-track">
                     <div class="stock-fill" id="medicineBar"></div>
                 </div>
@@ -589,15 +464,11 @@
 
         <div class="stock-item">
             <div class="stock-icon shelter-icon">⛺</div>
-
             <div class="stock-info">
                 <div class="stock-heading">
                     <span class="stock-label">SHELTER LEFT</span>
-                    <span class="stock-number" id="shelterRemaining">
-                        0/0
-                    </span>
+                    <span class="stock-number" id="shelterRemaining">0/0</span>
                 </div>
-
                 <div class="stock-track">
                     <div class="stock-fill" id="shelterBar"></div>
                 </div>
@@ -606,15 +477,11 @@
 
         <div class="stock-item">
             <div class="stock-icon nutrition-icon">🌾</div>
-
             <div class="stock-info">
                 <div class="stock-heading">
                     <span class="stock-label">NUTRITION LEFT</span>
-                    <span class="stock-number" id="nutritionRemaining">
-                        0/0
-                    </span>
+                    <span class="stock-number" id="nutritionRemaining">0/0</span>
                 </div>
-
                 <div class="stock-track">
                     <div class="stock-fill" id="nutritionBar"></div>
                 </div>
@@ -635,7 +502,6 @@
     </p>
 
     <!-- SELECTED EMERGENCY -->
-
     <section class="allocation-section">
         <h2>🎯 Selected Emergency</h2>
 
@@ -649,9 +515,7 @@
     </section>
 
     <!-- SUMMARY -->
-
     <section class="game-stats">
-
         <div class="stat-card">
             <h3>✈️ Available Flights</h3>
             <strong id="availableFlights">0</strong>
@@ -667,11 +531,9 @@
             <h3>🎯 Total Requested Units</h3>
             <strong id="requestedUnits">0</strong>
         </div>
-
     </section>
 
-    <!-- HUB -->
-
+    <!-- ASSIGNED HUB -->
     <section class="allocation-section">
         <h2>🏢 Assigned Supply Hub</h2>
 
@@ -692,8 +554,7 @@
         </div>
     </section>
 
-    <!-- ALLOCATION INPUTS -->
-
+    <!-- RESOURCE INPUTS -->
     <section class="allocation-section">
         <h2>📦 Available Resources</h2>
 
@@ -706,72 +567,29 @@
 
             <div class="resource-card">
                 <label for="medicine">💊 Medicine</label>
-
-                <p>
-                    Available:
-                    <strong id="medicineStock">0</strong>
-                </p>
-
-                <p>
-                    Needed:
-                    <strong id="medicineNeeded">0</strong>
-                </p>
-
-                <input
-                    type="number"
-                    id="medicine"
-                    min="0"
-                    step="1"
-                    value="0">
+                <p>Available: <strong id="medicineStock">0</strong></p>
+                <p>Needed: <strong id="medicineNeeded">0</strong></p>
+                <input type="number" id="medicine" min="0" step="1" value="0">
             </div>
 
             <div class="resource-card">
                 <label for="shelter">⛺ Shelter</label>
-
-                <p>
-                    Available:
-                    <strong id="shelterStock">0</strong>
-                </p>
-
-                <p>
-                    Needed:
-                    <strong id="shelterNeeded">0</strong>
-                </p>
-
-                <input
-                    type="number"
-                    id="shelter"
-                    min="0"
-                    step="1"
-                    value="0">
+                <p>Available: <strong id="shelterStock">0</strong></p>
+                <p>Needed: <strong id="shelterNeeded">0</strong></p>
+                <input type="number" id="shelter" min="0" step="1" value="0">
             </div>
 
             <div class="resource-card">
                 <label for="nutrition">🥫 Nutrition</label>
-
-                <p>
-                    Available:
-                    <strong id="nutritionStock">0</strong>
-                </p>
-
-                <p>
-                    Needed:
-                    <strong id="nutritionNeeded">0</strong>
-                </p>
-
-                <input
-                    type="number"
-                    id="nutrition"
-                    min="0"
-                    step="1"
-                    value="0">
+                <p>Available: <strong id="nutritionStock">0</strong></p>
+                <p>Needed: <strong id="nutritionNeeded">0</strong></p>
+                <input type="number" id="nutrition" min="0" step="1" value="0">
             </div>
 
         </div>
     </section>
 
-    <!-- LIVE FLIGHT WEIGHT -->
-
+    <!-- FLIGHT CAPACITY -->
     <section class="allocation-section">
         <h2>✈️ Live Flight Capacity</h2>
 
@@ -782,13 +600,9 @@
         </p>
 
         <div class="weight-display">
-
             <div class="weight-heading">
                 <span>Transport Weight Used</span>
-
-                <strong id="weightValue">
-                    0.00 / 0 tonnes
-                </strong>
+                <strong id="weightValue">0.00 / 0 tonnes</strong>
             </div>
 
             <div class="weight-track">
@@ -798,15 +612,12 @@
             <p id="weightWarning" class="weight-warning">
                 Enter resource quantities to see transport usage.
             </p>
-
         </div>
     </section>
 
     <!-- AI ADVISOR -->
-
     <section class="ai-panel">
         <div class="ai-label">Allocation Assistance</div>
-
         <h2>🤖 AI Allocation Advisor</h2>
 
         <p id="aiRecommendation">
@@ -814,19 +625,19 @@
         </p>
 
         <p class="info-text">
-            This is a temporary demonstration recommendation.
-            The actual AI advisor will be connected later.
+            Recommendations are generated by the backend fuzzy-logic
+            advisor. Review them before confirming your allocation.
         </p>
 
         <button
             class="game-button"
+            id="applyRecommendationButton"
             onclick="applyRecommendation()">
             Apply Suggested Allocation
         </button>
     </section>
 
-    <!-- CONFIRM -->
-
+    <!-- CONFIRM ALLOCATION -->
     <section class="allocation-section">
         <h2>🚀 Confirm Your Allocation</h2>
 
@@ -837,7 +648,9 @@
 
         <button
             class="game-button success"
-            onclick="confirmAllocation()">
+            id="confirmAllocationButton"
+            onclick="confirmAllocation()"
+            disabled>
             Confirm Allocation
         </button>
 
@@ -860,397 +673,42 @@
 </main>
 
 <script>
-    // FRONTEND DEMONSTRATION DATA ONLY.
-    // Replace with backend data later.
+    // Same-origin backend connection through web_server.py.
+    const API = "/api";
 
-    const emergencies = [
-        {
-            id: "REQ001",
-            location: "Gaza City",
-            urgency: "Critical",
-            people: 1200,
-            medicine: 500,
-            shelter: 300,
-            nutrition: 600,
-            supplyHub: "hub1"
-        },
-        {
-            id: "REQ002",
-            location: "Khan Younis",
-            urgency: "High",
-            people: 850,
-            medicine: 250,
-            shelter: 400,
-            nutrition: 450,
-            supplyHub: "hub2"
-        },
-        {
-            id: "REQ003",
-            location: "Deir al-Balah",
-            urgency: "Medium",
-            people: 600,
-            medicine: 150,
-            shelter: 200,
-            nutrition: 300,
-            supplyHub: "hub1"
-        }
-    ];
+    const resourceTypes = ["medicine", "shelter", "nutrition"];
 
-    const hubs = {
-        hub1: {
-            name: "Supply Hub A",
-            flights: 3,
-            capacityPerFlight: 5,
-            medicine: 400,
-            shelter: 250,
-            nutrition: 550
-        },
-
-        hub2: {
-            name: "Supply Hub B",
-            flights: 2,
-            capacityPerFlight: 4,
-            medicine: 300,
-            shelter: 350,
-            nutrition: 400
-        }
-    };
-
-    // Demo weights: tonnes per resource unit.
-
+    // These weights match backend/game_rule.py.
     const resourceWeights = {
         medicine: 0.01,
         shelter: 0.05,
         nutrition: 0.02
     };
 
-    const resourceTypes = [
-        "medicine",
-        "shelter",
-        "nutrition"
-    ];
-
     const selectedRequestId =
         sessionStorage.getItem("selectedRequestId");
 
-    const selectedEmergency = emergencies.find(
-        request => request.id === selectedRequestId
-    );
+    let selectedEmergency = null;
+    let currentHub = null;
+    let hubId = null;
+    let aiSuggestion = null;
+    let initialStock = null;
+    let confirmed = false;
 
-    const currentHub = selectedEmergency
-        ? hubs[selectedEmergency.supplyHub]
-        : null;
+    async function api(path, options = {}) {
+        const response = await fetch(API + path, options);
 
-    function getCapacity() {
-        if (!currentHub) return 0;
-
-        return currentHub.flights *
-            currentHub.capacityPerFlight;
-    }
-
-    function calculateWeight(allocation) {
-        return resourceTypes.reduce(
-            (total, resource) =>
-                total +
-                allocation[resource] * resourceWeights[resource],
-            0
-        );
-    }
-
-    function getCurrentAllocation() {
-        const allocation = {};
-
-        for (const resource of resourceTypes) {
-            const input = document.getElementById(resource);
-            const value = Number(input.value);
-
-            allocation[resource] =
-                input.value.trim() !== "" &&
-                Number.isFinite(value) &&
-                value >= 0
-                    ? value
-                    : 0;
-        }
-
-        return allocation;
-    }
-
-    // UPDATE TOP RESOURCE BARS
-
-    function updateResourceDashboard() {
-        if (!currentHub) return;
-
-        const allocation = getCurrentAllocation();
-
-        for (const resource of resourceTypes) {
-            const originalStock = currentHub[resource];
-
-            const remaining = Math.max(
-                0,
-                originalStock - allocation[resource]
+        if (!response.ok) {
+            throw new Error(
+                `Server returned ${response.status} for ${path}`
             );
-
-            const percentage = originalStock > 0
-                ? (remaining / originalStock) * 100
-                : 0;
-
-            document.getElementById(
-                resource + "Remaining"
-            ).textContent =
-                `${remaining.toLocaleString()} / ${originalStock.toLocaleString()}`;
-
-            document.getElementById(
-                resource + "Bar"
-            ).style.width =
-                Math.max(0, Math.min(100, percentage)) + "%";
         }
+
+        return response.json();
     }
 
-    // UPDATE FLIGHT WEIGHT BAR
-
-    function updateWeightDashboard() {
-        if (!currentHub) return;
-
-        const allocation = getCurrentAllocation();
-
-        const totalWeight = calculateWeight(allocation);
-        const capacity = getCapacity();
-
-        const percentage = capacity > 0
-            ? (totalWeight / capacity) * 100
-            : 0;
-
-        document.getElementById("weightValue")
-            .textContent =
-            `${totalWeight.toFixed(2)} / ${capacity} tonnes`;
-
-        const bar = document.getElementById("weightBar");
-
-        bar.style.width =
-            Math.min(100, percentage) + "%";
-
-        const warning =
-            document.getElementById("weightWarning");
-
-        if (totalWeight > capacity + 1e-9) {
-            bar.classList.add("over-limit");
-
-            warning.className = "weight-warning error";
-
-            warning.textContent =
-                `⚠️ Flight capacity exceeded by ` +
-                `${(totalWeight - capacity).toFixed(2)} tonnes. ` +
-                `Reduce your allocation.`;
-        } else {
-            bar.classList.remove("over-limit");
-
-            warning.className = "weight-warning";
-
-            warning.textContent =
-                `✓ ${(capacity - totalWeight).toFixed(2)} ` +
-                `tonnes of transport capacity remaining.`;
-        }
-    }
-
-    function updateLiveDashboard() {
-        updateResourceDashboard();
-        updateWeightDashboard();
-
-        // The player must reconfirm after editing quantities.
-        document.getElementById("viewResultsButton")
-            .style.display = "none";
-    }
-
-    // DEMO RECOMMENDATION
-
-    function getSuggestedAllocation() {
-        if (!selectedEmergency || !currentHub) {
-            return null;
-        }
-
-        const allocation = {
-            medicine: 0,
-            shelter: 0,
-            nutrition: 0
-        };
-
-        let remainingWeight = getCapacity();
-
-        for (const resource of resourceTypes) {
-            const maximumByCapacity = Math.max(
-                0,
-                Math.floor(
-                    (remainingWeight + 1e-9) /
-                    resourceWeights[resource]
-                )
-            );
-
-            const amount = Math.min(
-                selectedEmergency[resource],
-                currentHub[resource],
-                maximumByCapacity
-            );
-
-            allocation[resource] = amount;
-
-            remainingWeight -=
-                amount * resourceWeights[resource];
-        }
-
-        return allocation;
-    }
-
-    function updateRecommendation() {
-        const suggestion = getSuggestedAllocation();
-
-        const recommendation =
-            document.getElementById("aiRecommendation");
-
-        if (!suggestion) {
-            recommendation.textContent =
-                "Select an emergency to view a recommendation.";
-            return;
-        }
-
-        recommendation.textContent =
-            "Demo suggestion: " +
-            `${suggestion.medicine} medicine, ` +
-            `${suggestion.shelter} shelter, and ` +
-            `${suggestion.nutrition} nutrition units. ` +
-            `Estimated weight: ` +
-            `${calculateWeight(suggestion).toFixed(2)} tonnes.`;
-    }
-
-    function applyRecommendation() {
-        const suggestion = getSuggestedAllocation();
-
-        if (!suggestion) {
-            showFeedback(
-                "Please select an emergency first.",
-                true
-            );
-            return;
-        }
-
-        for (const resource of resourceTypes) {
-            document.getElementById(resource).value =
-                suggestion[resource];
-        }
-
-        updateLiveDashboard();
-
-        showFeedback(
-            "Demo recommendation applied. You can still edit the quantities.",
-            false,
-            false
-        );
-    }
-
-    // CONFIRM ALLOCATION
-
-    function confirmAllocation() {
-        document.getElementById("viewResultsButton")
-            .style.display = "none";
-
-        if (!selectedEmergency || !currentHub) {
-            showFeedback(
-                "Please select an emergency first.",
-                true
-            );
-            return;
-        }
-
-        const allocation = {};
-
-        for (const resource of resourceTypes) {
-            const input = document.getElementById(resource);
-            const amount = Number(input.value);
-
-            if (
-                input.value.trim() === "" ||
-                !Number.isSafeInteger(amount) ||
-                amount < 0
-            ) {
-                showFeedback(
-                    "Enter valid non-negative whole numbers.",
-                    true
-                );
-                return;
-            }
-
-            if (amount > currentHub[resource]) {
-                showFeedback(
-                    `Not enough ${resource} in the assigned hub.`,
-                    true
-                );
-                return;
-            }
-
-            if (amount > selectedEmergency[resource]) {
-                showFeedback(
-                    `${resource} exceeds the emergency's need.`,
-                    true
-                );
-                return;
-            }
-
-            allocation[resource] = amount;
-        }
-
-        const totalUnits = Object.values(allocation).reduce(
-            (sum, amount) => sum + amount,
-            0
-        );
-
-        if (totalUnits === 0) {
-            showFeedback(
-                "Allocate at least one unit.",
-                true
-            );
-            return;
-        }
-
-        const totalWeight = calculateWeight(allocation);
-
-        if (totalWeight > getCapacity() + 1e-9) {
-            showFeedback(
-                `Allocation weighs ${totalWeight.toFixed(2)} tonnes, ` +
-                `but only ${getCapacity()} tonnes are available.`,
-                true
-            );
-            return;
-        }
-
-        const result = {
-            requestId: selectedEmergency.id,
-            location: selectedEmergency.location,
-            urgency: selectedEmergency.urgency,
-            hub: selectedEmergency.supplyHub,
-            allocation: allocation,
-            totalUnits: totalUnits,
-            totalWeight: Number(totalWeight.toFixed(4)),
-            demoRecommendation: getSuggestedAllocation(),
-            timestamp: new Date().toISOString()
-        };
-
-        sessionStorage.setItem(
-            "playerAllocation",
-            JSON.stringify(result)
-        );
-
-        showFeedback(
-            "Allocation saved successfully! " +
-            `You allocated ${totalUnits} units weighing ` +
-            `${totalWeight.toFixed(2)} tonnes.`,
-            false,
-            true
-        );
-    }
-
-    function showFeedback(message, isError, showResults = false) {
+    function showFeedback(message, isError = false, showResults = false) {
         const feedback = document.getElementById("feedback");
-        const resultsButton =
-            document.getElementById("viewResultsButton");
 
         feedback.textContent = message;
 
@@ -1258,76 +716,483 @@
             ? "feedback error"
             : "feedback success-message";
 
-        resultsButton.style.display = showResults
-            ? "inline-block"
-            : "none";
+        document.getElementById("viewResultsButton").style.display =
+            showResults ? "inline-block" : "none";
     }
 
-    function initializePage() {
+    function calculateWeight(allocation) {
+        return resourceTypes.reduce(
+            (sum, name) =>
+                sum + allocation[name] * resourceWeights[name],
+            0
+        );
+    }
+
+    function getCurrentAllocation() {
+        const result = {};
+
+        for (const name of resourceTypes) {
+            const input = document.getElementById(name);
+            const value = Number(input.value);
+
+            result[name] =
+                input.value.trim() !== "" &&
+                Number.isFinite(value) &&
+                value >= 0
+                    ? value
+                    : 0;
+        }
+
+        return result;
+    }
+
+    // Update the resource bars as quantities change.
+    function updateResourceDashboard() {
+        if (!currentHub) return;
+
+        const allocation = getCurrentAllocation();
+
+        resourceTypes.forEach((name, i) => {
+            const available = Number(currentHub.stock[i]);
+
+            const remaining = Math.max(
+                0,
+                available - allocation[name]
+            );
+
+            const denominator = Math.max(
+                available,
+                initialStock ? initialStock[i] : available
+            );
+
+            document.getElementById(name + "Remaining").textContent =
+                `${remaining.toLocaleString()} / ${available.toLocaleString()}`;
+
+            document.getElementById(name + "Bar").style.width =
+                (
+                    denominator > 0
+                        ? Math.min(100, remaining / denominator * 100)
+                        : 0
+                ) + "%";
+        });
+    }
+
+    // Calculate the selected allocation's transport weight.
+    function updateWeightDashboard() {
+        if (!currentHub) return;
+
+        const weight = calculateWeight(getCurrentAllocation());
+        const capacity = Number(currentHub.capacity);
+
+        const percentage = capacity > 0
+            ? weight / capacity * 100
+            : (weight > 0 ? 100 : 0);
+
+        document.getElementById("weightValue").textContent =
+            `${weight.toFixed(2)} / ${capacity.toFixed(2)} tonnes`;
+
+        const bar = document.getElementById("weightBar");
+
+        bar.style.width =
+            Math.max(0, Math.min(100, percentage)) + "%";
+
+        const warning = document.getElementById("weightWarning");
+
+        if (weight > capacity + 1e-9) {
+            bar.classList.add("over-limit");
+            warning.className = "weight-warning error";
+            warning.textContent =
+                `⚠️ Flight capacity exceeded by ` +
+                `${(weight - capacity).toFixed(2)} tonnes.`;
+
+        } else if (Number(currentHub.slots) <= 0) {
+            bar.classList.remove("over-limit");
+            warning.className = "weight-warning error";
+            warning.textContent =
+                "⚠️ No flight slots are available at this hub.";
+
+        } else {
+            bar.classList.remove("over-limit");
+            warning.className = "weight-warning";
+            warning.textContent =
+                `✓ ${(capacity - weight).toFixed(2)} tonnes ` +
+                `of transport capacity remaining.`;
+        }
+    }
+
+    function updateLiveDashboard() {
+        updateResourceDashboard();
+        updateWeightDashboard();
+    }
+
+    // Display real hub stock, flight slots and capacity.
+    function displayHubResources() {
+        document.getElementById("assignedHub").textContent = hubId;
+
+        document.getElementById("availableFlights").textContent =
+            currentHub.slots;
+
+        document.getElementById("flightCapacity").textContent =
+            Number(currentHub.capacity).toFixed(2);
+
+        resourceTypes.forEach((name, i) => {
+            document.getElementById(name + "Stock").textContent =
+                currentHub.stock[i];
+        });
+
+        updateLiveDashboard();
+    }
+
+    // Apply the actual fuzzy-logic AI recommendation.
+    function applyRecommendation() {
+        if (!aiSuggestion || confirmed) {
+            showFeedback(
+                "No AI recommendation is available for this request.",
+                true
+            );
+            return;
+        }
+
+        for (const name of resourceTypes) {
+            document.getElementById(name).value =
+                aiSuggestion[name];
+        }
+
+        updateLiveDashboard();
+
+        showFeedback(
+            "AI recommendation applied. You can still adjust " +
+            "the quantities before confirming."
+        );
+    }
+
+    // Submit the player's allocation to FastAPI.
+    async function confirmAllocation() {
+        if (confirmed) return;
+
         if (!selectedEmergency || !currentHub) {
-            document.getElementById("selectedEmergency")
-                .textContent =
-                "No emergency selected. Return to Emergency Requests.";
+            showFeedback(
+                "Please select an emergency from the Requests page first.",
+                true
+            );
+            return;
+        }
 
-            document.getElementById("assignedHub")
-                .textContent = "No hub assigned";
+        const allocation = {};
 
-            document.getElementById("aiRecommendation")
-                .textContent =
-                "Select an emergency to see the demo suggestion.";
+        const requiredFields = {
+            medicine: "medicine_required_kits",
+            shelter: "shelter_required_kits",
+            nutrition: "nutrition_required_parcels"
+        };
+
+        for (let i = 0; i < resourceTypes.length; i++) {
+            const name = resourceTypes[i];
+            const input = document.getElementById(name);
+            const value = Number(input.value);
+
+            if (
+                !input.value.trim() ||
+                !Number.isSafeInteger(value) ||
+                value < 0
+            ) {
+                showFeedback(
+                    "Enter valid non-negative whole numbers " +
+                    "for every resource.",
+                    true
+                );
+                return;
+            }
+
+            if (
+                value >
+                Number(selectedEmergency[requiredFields[name]])
+            ) {
+                showFeedback(
+                    `${name} exceeds this emergency's requested amount.`,
+                    true
+                );
+                return;
+            }
+
+            if (value > Number(currentHub.stock[i])) {
+                showFeedback(
+                    `Not enough ${name} is available at the assigned hub.`,
+                    true
+                );
+                return;
+            }
+
+            allocation[name] = value;
+        }
+
+        if (Object.values(allocation).every(value => value === 0)) {
+            showFeedback(
+                "Allocate at least one resource unit.",
+                true
+            );
+            return;
+        }
+
+        if (Number(currentHub.slots) <= 0) {
+            showFeedback(
+                "No flight slots remain at the assigned hub.",
+                true
+            );
+            return;
+        }
+
+        if (
+            calculateWeight(allocation) >
+            Number(currentHub.capacity) + 1e-9
+        ) {
+            showFeedback(
+                "Allocation exceeds remaining transport capacity.",
+                true
+            );
+            return;
+        }
+
+        const button =
+            document.getElementById("confirmAllocationButton");
+
+        button.disabled = true;
+
+        try {
+            // Start the game if it has not started yet.
+            const state = await api("/game-status");
+
+            if (state.game_state === "READY") {
+                await api("/start", { method: "POST" });
+
+            } else if (state.game_state !== "ALLOCATING") {
+                throw new Error(
+                    "The simulation is complete. Reset it before " +
+                    "allocating again."
+                );
+            }
+
+            // Send the real allocation to the backend.
+            const result = await api("/allocate", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    request_id: selectedRequestId,
+                    ...allocation
+                })
+            });
+
+            // The existing backend may report errors in JSON.
+            if (
+                result.status === "Allocation Failed" ||
+                result.error ||
+                result.detail
+            ) {
+                throw new Error(
+                    result.error ||
+                    result.detail ||
+                    "Allocation failed backend validation."
+                );
+            }
+
+            confirmed = true;
+
+            // Keep a summary for the Results page.
+            sessionStorage.setItem(
+                "playerAllocation",
+                JSON.stringify({
+                    requestId: selectedRequestId,
+                    location: selectedEmergency.location,
+                    hub: hubId,
+                    allocation: allocation,
+                    totalUnits: Object.values(allocation).reduce(
+                        (a, b) => a + b,
+                        0
+                    ),
+                    totalWeight: calculateWeight(allocation),
+                    aiRecommendation: aiSuggestion,
+                    status: result.status,
+                    timestamp: new Date().toISOString()
+                })
+            );
+
+            // Refresh actual remaining stock after confirmation.
+            const allResources = await api("/resources");
+            currentHub = allResources[hubId];
+
+            displayHubResources();
+
+            for (const name of resourceTypes) {
+                document.getElementById(name).disabled = true;
+            }
+
+            document.getElementById(
+                "applyRecommendationButton"
+            ).disabled = true;
+
+            showFeedback(
+                `✓ Allocation confirmed by backend. ` +
+                `Status: ${result.status}.`,
+                false,
+                true
+            );
+
+        } catch (error) {
+            showFeedback(
+                "Could not confirm allocation: " + error.message,
+                true
+            );
+
+            button.disabled = false;
+        }
+    }
+
+    // Load the selected request, assigned hub and AI recommendation.
+    async function initializePage() {
+        if (!selectedRequestId) {
+            document.getElementById("selectedEmergency").textContent =
+                "No emergency selected. Please return to Emergency Requests.";
+
+            document.getElementById("aiRecommendation").textContent =
+                "Select an emergency first.";
 
             return;
         }
 
-        document.getElementById("selectedEmergency")
-            .textContent =
-            `${selectedEmergency.location} ` +
-            `(${selectedEmergency.id}) — ` +
-            `${selectedEmergency.urgency} Priority — ` +
-            `${selectedEmergency.people.toLocaleString()} people affected`;
+        try {
+            const requests = await api("/requests");
 
-        document.getElementById("assignedHub")
-            .textContent = currentHub.name;
+            selectedEmergency = requests.find(
+                request =>
+                    String(request.request_id) === selectedRequestId
+            );
 
-        document.getElementById("availableFlights")
-            .textContent = currentHub.flights;
+            if (!selectedEmergency) {
+                throw new Error(
+                    "The selected request was not found in today's backend data."
+                );
+            }
 
-        document.getElementById("flightCapacity")
-            .textContent = getCapacity();
+            // The recommendation endpoint also supplies the assigned hub.
+            const recommendation = await api(
+                `/recommendation/${encodeURIComponent(selectedRequestId)}`
+            );
 
-        let totalNeeded = 0;
+            if (recommendation.error || !recommendation.supply_hub) {
+                throw new Error(
+                    recommendation.error ||
+                    "The assigned supply hub is unavailable."
+                );
+            }
 
-        for (const resource of resourceTypes) {
-            document.getElementById(resource + "Stock")
-                .textContent = currentHub[resource];
+            hubId = String(recommendation.supply_hub);
 
-            document.getElementById(resource + "Needed")
-                .textContent = selectedEmergency[resource];
+            const resources = await api("/resources");
+            currentHub = resources[hubId];
 
-            document.getElementById(resource).value = 0;
+            if (!currentHub) {
+                throw new Error(
+                    "The assigned hub was not found in backend resources."
+                );
+            }
 
-            totalNeeded += selectedEmergency[resource];
+            initialStock = [...currentHub.stock];
+
+            document.getElementById("selectedEmergency").textContent =
+                `${selectedEmergency.location} ` +
+                `(${selectedEmergency.request_id}) — ` +
+                `Urgency Level ${selectedEmergency.urgency_level} — ` +
+                `${Number(selectedEmergency.population_affected).toLocaleString()} ` +
+                `people affected`;
+
+            const fields = [
+                "medicine_required_kits",
+                "shelter_required_kits",
+                "nutrition_required_parcels"
+            ];
+
+            fields.forEach((field, i) => {
+                document.getElementById(
+                    resourceTypes[i] + "Needed"
+                ).textContent = selectedEmergency[field];
+            });
+
+            document.getElementById("requestedUnits").textContent =
+                fields.reduce(
+                    (sum, field) =>
+                        sum + Number(selectedEmergency[field] || 0),
+                    0
+                ).toLocaleString();
+
+            displayHubResources();
+
+            // Read the actual fuzzy-logic AI recommendation.
+            const rawSuggestion = recommendation.suggested_allocation;
+
+            if (
+                rawSuggestion &&
+                resourceTypes.every(name =>
+                    Number.isFinite(Number(rawSuggestion[name]))
+                )
+            ) {
+                aiSuggestion = Object.fromEntries(
+                    resourceTypes.map(name => [
+                        name,
+                        Number(rawSuggestion[name])
+                    ])
+                );
+
+                const weight = calculateWeight(aiSuggestion);
+
+                const transportNote =
+                    recommendation.transport_available === false
+                        ? " ⚠️ This suggestion cannot currently be " +
+                          "transported. Adjust quantities before confirming."
+                        : "";
+
+                document.getElementById("aiRecommendation").textContent =
+                    `${recommendation.explanation || "Backend AI recommendation"} ` +
+                    `Suggested: ${aiSuggestion.medicine} medicine, ` +
+                    `${aiSuggestion.shelter} shelter, ` +
+                    `${aiSuggestion.nutrition} nutrition units ` +
+                    `(${weight.toFixed(2)} tonnes).` +
+                    transportNote;
+
+            } else {
+                document.getElementById("aiRecommendation").textContent =
+                    "No AI suggestion is available.";
+            }
+
+            document.getElementById(
+                "confirmAllocationButton"
+            ).disabled = false;
+
+        } catch (error) {
+            document.getElementById("selectedEmergency").textContent =
+                "Unable to load the selected emergency.";
+
+            document.getElementById("aiRecommendation").textContent =
+                "AI recommendation unavailable.";
+
+            showFeedback(
+                "Backend connection problem: " + error.message,
+                true
+            );
         }
-
-        document.getElementById("requestedUnits")
-            .textContent = totalNeeded.toLocaleString();
-
-        updateRecommendation();
-        updateLiveDashboard();
     }
 
-    // LISTEN FOR INPUT CHANGES
-
-    for (const resource of resourceTypes) {
-        document.getElementById(resource).addEventListener(
+    // Update bars whenever the player changes a quantity.
+    resourceTypes.forEach(name => {
+        document.getElementById(name).addEventListener(
             "input",
             updateLiveDashboard
         );
-    }
+    });
 
     initializePage();
 </script>
 
 </body>
 </html>
-
