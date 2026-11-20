@@ -1,5 +1,6 @@
+"""Fuzzy resource recommendations and transport checks."""
 
-from backend.game_rule import calculate_weight
+from backend.game_rule import check_transport_capacity
 
 
 # FUZZY LOGIC AI ASSISTANT
@@ -206,41 +207,20 @@ def suggest_allocation(required, available, priority, total_demand):
 # 5. TRANSPORT CAPACITY CHECKS
 # --------------------------------------------------
 
-# Check if the recommendation fits the available transport
 def check_suggestion_transport(suggested, capacity, slots):
-
-    # A flight slot must be available
-    if slots <= 0:
-        return False
-
-    # The allocation must not exceed flight capacity
-    if calculate_weight(suggested) > capacity:
-        return False
-
-    return True
+    """Check the slot and cargo limits used by the player and the AI."""
+    return slots > 0 and check_transport_capacity(suggested, capacity)
 
 
-# Reduce the suggested quantities until they fit transport limits
 def adjust_for_transport(suggested, capacity, slots):
-
-    # No resources can be sent without transport availability
+    """Trim a copy of the recommendation to fit the available transport."""
     if slots <= 0 or capacity <= 0:
         return [0, 0, 0]
 
-    # Copy the recommendation to avoid changing the original list
     adjusted = suggested.copy()
-
-    # Keep reducing quantities while the weight exceeds capacity
-    while calculate_weight(adjusted) > capacity:
-
-        # Stop if there are no resources left to reduce
-        if all(amount == 0 for amount in adjusted):
-            break
-
-        # Reduce each resource quantity one unit at a time
-        for i in range(3):
-            if adjusted[i] > 0:
-                adjusted[i] -= 1
+    while not check_transport_capacity(adjusted, capacity):
+        # Reduce each nonzero supply by one unit to preserve the existing policy.
+        adjusted = [max(0, amount - 1) for amount in adjusted]
 
     return adjusted
 

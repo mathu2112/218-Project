@@ -1,10 +1,15 @@
 import copy
 import random
+from fractions import Fraction
+from math import isnan
 
 from fastapi import FastAPI
 
-from backend.evaluation.experiments import run_current_backend_evaluation, compare_strategies
-from backend.evaluation.baseline import simulate_baseline
+from backend.evaluation.experiments import (
+    compare_strategies,
+    run_current_backend_evaluation,
+)
+from backend.evaluation.metrics import get_request_status
 from backend.load_data import load_data, get_requests
 from backend.game_rule import (
     check_request_fulfilment,
@@ -31,7 +36,7 @@ from backend.fuzzy_logic import (
 app = FastAPI()
 
 # Load the dataset once when the backend starts
-requests, locations, hubs, stock, flights = load_data()
+requests, _, hubs, stock, flights = load_data()
 
 # Store player allocations and the current hub resources
 allocation_history = []
@@ -39,7 +44,14 @@ hub_resources = {}
 original_hub_resources = {}
 
 # Choose a date that contains emergency requests
-available_dates = requests["request_datetime"].str[:10].dropna().unique().tolist()
+active_requests = requests.loc[requests["fulfilment_status"].ne("Cancelled")]
+available_dates = active_requests["request_datetime"].str[:10].dropna().unique().tolist()
+slot_capacity_by_hub = hubs.set_index("hub_id")["aircraft_capacity_tonnes"].to_dict()
+SUPPLY_FIELDS = (
+    ("medicine_required_kits", "medicine_allocated"),
+    ("shelter_required_kits", "shelter_allocated"),
+    ("nutrition_required_parcels", "nutrition_allocated"),
+)
 selected_date = random.choice(available_dates)
 
 
@@ -75,6 +87,7 @@ def load_hub_resources():
             ],
             "capacity": float(hub_flight["total_capacity_tonnes"]),
             "slots": int(hub_flight["flight_slots_available"]),
+            "slot_capacity": float(slot_capacity_by_hub[hub_id]),
         }
 
     # Keep the original values for AI simulation and resets
@@ -82,10 +95,8 @@ def load_hub_resources():
 
 
 def get_daily_requests():
-    # Return only requests from the selected date
-    return requests[
-        requests["request_datetime"].str[:10] == selected_date
-    ].copy()
+    on_selected_date = active_requests["request_datetime"].str[:10] == selected_date
+    return active_requests.loc[on_selected_date].copy()
 
 
 def get_total_demand(hub_id):
@@ -173,7 +184,7 @@ def simulate_ai():
         # Reduce quantities if transport capacity is limited
         suggested = adjust_for_transport(
             suggested,
-            resources["capacity"],
+            min(resources["capacity"], resources["slot_capacity"]),
             resources["slots"],
         )
 
@@ -182,7 +193,7 @@ def simulate_ai():
             for i in range(3):
                 resources["stock"][i] -= suggested[i]
 
-            resources["capacity"] -= calculate_weight(suggested)
+            resources["capacity"] = round(resources["capacity"] - calculate_weight(suggested), 2)
             resources["slots"] -= 1
 
         # Record the outcome for evaluation
@@ -269,7 +280,8 @@ def finish():
 @app.get("/recommendation/{request_id}")
 def get_recommendation(request_id: str):
     # Find the requested emergency
-    matching = requests[requests["request_id"] == request_id]
+    daily_requests = get_daily_requests()
+    matching = daily_requests.loc[daily_requests["request_id"] == request_id]
     if matching.empty:
         return {"error": "Request not found"}
 
@@ -282,11 +294,6 @@ def get_recommendation(request_id: str):
         int(request["shelter_required_kits"]),
         int(request["nutrition_required_parcels"]),
     ]
-
-    # Only recommend for the selected game's requests
-    request_date = str(request["request_datetime"])[:10]
-    if request_date != selected_date:
-        return {"error": "Request is not for the selected game date"}
 
     if hub_id not in hub_resources:
         return {"error": "Supply hub not found"}
@@ -304,7 +311,7 @@ def get_recommendation(request_id: str):
     # Fit the recommendation within transport limits
     suggested = adjust_for_transport(
         suggested,
-        resources["capacity"],
+        min(resources["capacity"], resources["slot_capacity"]),
         resources["slots"],
     )
 
@@ -312,9 +319,9 @@ def get_recommendation(request_id: str):
     explanation = explain_recommendation(priority, required, suggested)
 
     # Check whether transport is available
-    capacity = resources["capacity"]
+    capacity = min(resources["capacity"], resources["slot_capacity"])
     slots = resources["slots"]
-    transport_ok = check_suggestion_transport(suggested, capacity, slots)
+    transport_ok = capacity > 0 and check_suggestion_transport(suggested, capacity, slots)
 
     if slots <= 0:
         transport_message = "No flight slots are available."
@@ -357,21 +364,16 @@ def allocate(data: dict):
     if any(key not in data for key in ("medicine", "shelter", "nutrition")):
         return {"error": "Medicine, shelter and nutrition quantities are required"}
 
-    allocated = [
-        int(data["medicine"]),
-        int(data["shelter"]),
-        int(data["nutrition"]),
-    ]
+    allocated = [data["medicine"], data["shelter"], data["nutrition"]]
+    if any(type(amount) is not int or amount < 0 for amount in allocated):
+        return {"error": "Enter a non-negative whole number for each resource."}
 
-    # Reject empty or negative allocations
-    if allocated == [0, 0, 0]:
+    if not any(allocated):
         return {"error": "You must allocate at least one resource"}
 
-    if any(amount < 0 for amount in allocated):
-        return {"error": "Resource quantities cannot be negative"}
-
     # Find the request in the dataset
-    matching = requests[requests["request_id"] == request_id]
+    daily_requests = get_daily_requests()
+    matching = daily_requests.loc[daily_requests["request_id"] == request_id]
     if matching.empty:
         return {"error": "Request not found"}
 
@@ -382,13 +384,13 @@ def allocate(data: dict):
 
     request = matching.iloc[0].to_dict()
 
-    # Only accept requests from the current game date
-    request_date = str(request["request_datetime"])[:10]
-    if request_date != selected_date:
-        return {"error": "Request is not for the selected game date"}
-
     if request["supply_hub"] not in hub_resources:
         return {"error": "Supply hub not found"}
+
+    # A single dispatch must fit one slot as well as the hub's daily budget.
+    resources = hub_resources[request["supply_hub"]]
+    if round(calculate_weight(allocated), 2) > resources["slot_capacity"]:
+        return {"error": "The allocation exceeds the capacity of one dispatch"}
 
     # Apply game rules and save the player's allocation
     status = allocate_request(
@@ -442,28 +444,86 @@ def show_hub_resources():
 # --------------------------------------------------
 
 def prepare_evaluation_allocations(history):
-    """Combine all current requests with a strategy's recorded allocations."""
+    """Score every active request, including those that received no aid."""
     recorded = {record["request_id"]: record for record in history}
     evaluated = []
 
     for _, request in get_daily_requests().iterrows():
         request_id = request["request_id"]
         allocation = recorded.get(request_id, {})
-        evaluated.append({
+        population = int(request["population_affected"])
+        row = {
             "request_id": request_id,
             "supply_hub": request["supply_hub"],
             "expert_priority_label": request["expert_priority_label"],
-            "urgency_level": request["urgency_level"],
-            "severity_level": request["severity_level"],
-            "medicine_required_kits": int(request["medicine_required_kits"]),
-            "shelter_required_kits": int(request["shelter_required_kits"]),
-            "nutrition_required_parcels": int(request["nutrition_required_parcels"]),
-            "medicine_allocated": int(allocation.get("medicine_allocated", 0)),
-            "shelter_allocated": int(allocation.get("shelter_allocated", 0)),
-            "nutrition_allocated": int(allocation.get("nutrition_allocated", 0)),
-        })
+            "location": request["location"],
+            "population_affected": population,
+        }
+
+        coverage = []
+        dispatched = False
+        for required_field, allocated_field in SUPPLY_FIELDS:
+            required = int(request[required_field])
+            delivered = int(allocation.get(allocated_field, 0))
+            row[required_field] = required
+            row[allocated_field] = delivered
+            dispatched = dispatched or delivered > 0
+            if required > 0:
+                coverage.append(Fraction(delivered, required))
+
+        # The least fulfilled required supply limits estimated coverage.
+        row["beneficiaries_served"] = int(population * min(coverage, default=0))
+
+        # Use the same lateness estimate for all strategies, without a queue model.
+        row["delivery_delay_hours"] = None
+        if dispatched:
+            travel_hours = float(request["estimated_delivery_time_hours"])
+            if isnan(travel_hours):
+                travel_hours = 6.0
+            target_hours = float(request["time_sensitivity_hours"])
+            row["delivery_delay_hours"] = max(0.0, travel_hours - target_hours)
+
+        evaluated.append(row)
 
     return evaluated
+
+
+def add_scenario_metrics(metrics, allocations):
+    """Add the course-specific measures to the shared evaluation output."""
+    critical_statuses = [
+        get_request_status(row)
+        for row in allocations
+        if row["expert_priority_label"] == "Critical"
+    ]
+    critical_total = len(critical_statuses)
+    fulfilled = critical_statuses.count("Fulfilled")
+    metrics["critical_fulfilment"] = {
+        "total_critical_requests": critical_total,
+        "fulfilled_critical_requests": fulfilled,
+        "partially_fulfilled_critical_requests": critical_statuses.count("Partially Fulfilled"),
+        "unfulfilled_critical_requests": critical_statuses.count("Unfulfilled"),
+        "critical_fulfilment_rate": round(100 * fulfilled / critical_total, 2)
+        if critical_total else 0,
+    }
+
+    location_totals = {}
+    for row in allocations:
+        totals = location_totals.setdefault(row["location"], {"served": 0, "population": 0})
+        totals["served"] += row["beneficiaries_served"]
+        totals["population"] += row["population_affected"]
+
+    coverage = {
+        location: 100 * totals["served"] / totals["population"]
+        for location, totals in location_totals.items()
+        if totals["population"] > 0
+    }
+    metrics["location_fairness"] = {
+        "coverage_by_location": {
+            location: round(rate, 2) for location, rate in coverage.items()
+        },
+        "coverage_gap_pp": round(max(coverage.values()) - min(coverage.values()), 2)
+        if len(coverage) > 1 else None,
+    }
 
 
 def get_initial_stock_totals():
@@ -478,20 +538,20 @@ def get_initial_stock_totals():
 
 @app.get("/evaluation")
 def get_evaluation():
-    """Compare AI, player, and greedy baseline allocations."""
-
-    # Get AI allocations
+    """Compare the player and fuzzy AI with the dataset's recorded allocations."""
     ai_allocations = prepare_evaluation_allocations(simulate_ai())
-
-    # Get player allocations
     player_allocations = prepare_evaluation_allocations(allocation_history)
 
-    # Run the greedy baseline using the same starting resources
-    baseline_history = simulate_baseline(
-        get_daily_requests(),
-        copy.deepcopy(original_hub_resources)
-    )
-
+    daily_requests = get_daily_requests()
+    baseline_history = [
+        {
+            "request_id": row.request_id,
+            "medicine_allocated": int(row.medicine_allocated_kits),
+            "shelter_allocated": int(row.shelter_allocated_kits),
+            "nutrition_allocated": int(row.nutrition_allocated_parcels),
+        }
+        for row in daily_requests.itertuples(index=False)
+    ]
     baseline_allocations = prepare_evaluation_allocations(baseline_history)
 
     # Evaluate all three strategies
@@ -502,6 +562,15 @@ def get_evaluation():
         available_stock=get_initial_stock_totals(),
         scenario_name=selected_date,
     )
+
+    # Keep the shared evaluation module compatible with its existing callers.
+    for result, name, allocations in zip(
+        results,
+        ("AI Recommended Allocation", "Player", "Dataset Baseline"),
+        (ai_allocations, player_allocations, baseline_allocations),
+    ):
+        result["strategy"] = name
+        add_scenario_metrics(result["metrics"], allocations)
 
     return {
         "selected_date": selected_date,
