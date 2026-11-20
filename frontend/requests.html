@@ -9,25 +9,12 @@
 
     <style>
         /* EMERGENCY REQUESTS PAGE THEME */
-
         body {
             margin: 0;
             background:
-                linear-gradient(
-                    rgba(0, 210, 235, 0.035) 1px,
-                    transparent 1px
-                ),
-                linear-gradient(
-                    90deg,
-                    rgba(0, 210, 235, 0.035) 1px,
-                    transparent 1px
-                ),
-                radial-gradient(
-                    ellipse at 85% 0%,
-                    #12354a 0%,
-                    #071529 45%,
-                    #030b1d 100%
-                );
+                linear-gradient(rgba(0, 210, 235, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 210, 235, 0.035) 1px, transparent 1px),
+                radial-gradient(ellipse at 85% 0%, #12354a 0%, #071529 45%, #030b1d 100%);
             background-size: 55px 55px, 55px 55px, cover;
             background-attachment: fixed;
             color: #e8f4ff;
@@ -35,7 +22,6 @@
         }
 
         /* HEADER */
-
         .game-header {
             background: rgba(4, 17, 36, 0.95);
             border-bottom: 1px solid rgba(0, 219, 234, 0.25);
@@ -59,7 +45,6 @@
         }
 
         /* NAVIGATION */
-
         .game-nav {
             display: flex;
             flex-wrap: wrap;
@@ -101,7 +86,6 @@
         }
 
         /* MAIN CONTENT */
-
         .game-container {
             max-width: 1250px;
             margin: 0 auto;
@@ -130,7 +114,6 @@
         }
 
         /* SUMMARY CARDS */
-
         .game-stats {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -166,7 +149,6 @@
         }
 
         /* EMERGENCY REQUEST CARDS */
-
         .request-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -201,7 +183,6 @@
         }
 
         /* PRIORITY BADGES */
-
         .priority {
             display: inline-block;
             align-self: flex-start;
@@ -230,8 +211,13 @@
             border: 1px solid rgba(255, 210, 80, 0.45);
         }
 
-        /* REQUEST DETAILS */
+        .priority.low {
+            color: #9de8b5;
+            background: rgba(80, 210, 120, 0.12);
+            border: 1px solid rgba(80, 210, 120, 0.45);
+        }
 
+        /* REQUEST DETAILS */
         .emergency-details {
             color: #b8cede;
             line-height: 2.1;
@@ -244,7 +230,6 @@
         }
 
         /* BUTTONS */
-
         .game-button {
             display: inline-block;
             background: linear-gradient(110deg, #073b50, #0b2b40);
@@ -276,7 +261,6 @@
         }
 
         /* SELECTED REQUEST PANEL */
-
         .mission-panel {
             margin-top: 38px;
             padding: 30px;
@@ -298,7 +282,6 @@
         }
 
         /* RESPONSIVE DESIGN */
-
         @media (max-width: 900px) {
             .request-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -329,7 +312,6 @@
 </head>
 
 <body>
-
     <header class="game-header">
         <h1>✈️ Humanitarian Air Bridge</h1>
         <p>Humanitarian Logistics Simulation</p>
@@ -354,7 +336,6 @@
     </nav>
 
     <main class="game-container">
-
         <h1 class="game-title">🚨 Emergency Requests</h1>
 
         <p class="game-subtitle">
@@ -392,6 +373,7 @@
             class="request-grid"
             id="requestContainer"
             aria-label="Emergency requests">
+            <p>Loading emergency requests...</p>
         </section>
 
         <section class="mission-panel">
@@ -409,50 +391,90 @@
                 Continue to Resource Allocation →
             </button>
         </section>
-
     </main>
 
     <script>
-        // Temporary frontend demonstration data.
-        // Later, this can be replaced by real dataset/API data.
+        // Connect to the Python FastAPI backend.
+        const API_BASE_URL = "/api";
 
-        const emergencyRequests = [
-            {
-                id: "REQ001",
-                location: "Gaza City",
-                urgency: "Critical",
-                people: 1200,
-                medicine: 500,
-                shelter: 300,
-                nutrition: 600
-            },
-            {
-                id: "REQ002",
-                location: "Khan Younis",
-                urgency: "High",
-                people: 850,
-                medicine: 250,
-                shelter: 400,
-                nutrition: 450
-            },
-            {
-                id: "REQ003",
-                location: "Deir al-Balah",
-                urgency: "Medium",
-                people: 600,
-                medicine: 150,
-                shelter: 200,
-                nutrition: 300
-            }
-        ];
-
+        let emergencyRequests = [];
         let selectedRequestId = null;
 
-        function displayRequests() {
-            const container =
-                document.getElementById("requestContainer");
+        // Safely display text received from the backend.
+        function escapeHTML(value) {
+            return String(value ?? "").replace(/[&<>"']/g, char => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            }[char]));
+        }
 
+        function numberValue(value) {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : 0;
+        }
+
+        // Load real emergency requests from FastAPI.
+        async function loadEmergencyRequests() {
+            const container = document.getElementById("requestContainer");
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/requests`);
+
+                if (!response.ok) {
+                    throw new Error(`Backend returned ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!Array.isArray(data)) {
+                    throw new Error("Unexpected response format");
+                }
+
+                emergencyRequests = data.map(request => {
+                    // Use the backend's actual priority label when supplied.
+                    const priority = String(
+                        request.expert_priority_label ||
+                        `Urgency Level ${request.urgency_level ?? "Unknown"}`
+                    );
+
+                    return {
+                        id: String(request.request_id),
+                        location: String(request.location || request.location_id || "Unknown Location"),
+                        urgency: priority,
+                        people: numberValue(request.population_affected),
+                        medicine: numberValue(request.medicine_required_kits),
+                        shelter: numberValue(request.shelter_required_kits),
+                        nutrition: numberValue(request.nutrition_required_parcels)
+                    };
+                });
+
+                updateSummary();
+                displayRequests();
+
+            } catch (error) {
+                console.error("Could not load emergency requests:", error);
+
+                container.innerHTML = `
+                    <p style="color:#ff8b96;line-height:1.8;">
+                        Unable to load emergency requests from the backend.
+                        Please check that FastAPI is running and
+                        that the frontend can connect to it.
+                    </p>
+                `;
+            }
+        }
+
+        function displayRequests() {
+            const container = document.getElementById("requestContainer");
             container.innerHTML = "";
+
+            if (emergencyRequests.length === 0) {
+                container.innerHTML = "<p>No emergency requests available.</p>";
+                return;
+            }
 
             emergencyRequests.forEach(request => {
                 const card = document.createElement("div");
@@ -462,26 +484,28 @@
                     card.classList.add("selected");
                 }
 
-                const urgencyClass =
-                    request.urgency.toLowerCase();
+                const priorityClass = ["critical", "high", "medium", "low"]
+                    .includes(request.urgency.toLowerCase())
+                    ? request.urgency.toLowerCase()
+                    : "";
 
                 card.innerHTML = `
-                    <h3>📍 ${request.location}</h3>
+                    <h3>📍 ${escapeHTML(request.location)}</h3>
 
-                    <span class="priority ${urgencyClass}">
-                        ${request.urgency.toUpperCase()} PRIORITY
+                    <span class="priority ${priorityClass}">
+                        ${escapeHTML(request.urgency.toUpperCase())}
                     </span>
 
                     <div class="emergency-details">
-                        <strong>Request:</strong> ${request.id}<br>
+                        <strong>Request:</strong> ${escapeHTML(request.id)}<br>
                         <strong>👥 People Affected:</strong>
                         ${request.people.toLocaleString()}<br>
                         <strong>💊 Medicine:</strong>
-                        ${request.medicine} units<br>
+                        ${request.medicine.toLocaleString()} units<br>
                         <strong>⛺ Shelter:</strong>
-                        ${request.shelter} units<br>
+                        ${request.shelter.toLocaleString()} units<br>
                         <strong>🥫 Nutrition:</strong>
-                        ${request.nutrition} units
+                        ${request.nutrition.toLocaleString()} units
                     </div>
 
                     <button class="game-button" type="button">
@@ -491,22 +515,21 @@
                     </button>
                 `;
 
-                card.querySelector("button")
-                    .addEventListener("click", () => {
-                        selectRequest(request.id);
-                    });
+                card.querySelector("button").addEventListener("click", () => {
+                    selectRequest(request.id);
+                });
 
                 container.appendChild(card);
             });
         }
 
         function updateSummary() {
-            document.getElementById("totalRequests")
-                .textContent = emergencyRequests.length;
+            document.getElementById("totalRequests").textContent =
+                emergencyRequests.length;
 
-            document.getElementById("criticalRequests")
-                .textContent = emergencyRequests.filter(
-                    request => request.urgency === "Critical"
+            document.getElementById("criticalRequests").textContent =
+                emergencyRequests.filter(
+                    request => request.urgency.toLowerCase() === "critical"
                 ).length;
 
             const totalPeople = emergencyRequests.reduce(
@@ -514,8 +537,8 @@
                 0
             );
 
-            document.getElementById("totalPeople")
-                .textContent = totalPeople.toLocaleString();
+            document.getElementById("totalPeople").textContent =
+                totalPeople.toLocaleString();
         }
 
         function selectRequest(requestId) {
@@ -525,14 +548,14 @@
                 item => item.id === requestId
             );
 
-            document.getElementById("selectedRequest")
-                .textContent =
+            if (!request) return;
+
+            document.getElementById("selectedRequest").textContent =
                 `${request.location} (${request.id}) — ` +
-                `${request.urgency} Priority | ` +
+                `${request.urgency} | ` +
                 `${request.people.toLocaleString()} people affected`;
 
-            document.getElementById("continueButton")
-                .disabled = false;
+            document.getElementById("continueButton").disabled = false;
 
             displayRequests();
         }
@@ -551,10 +574,7 @@
             window.location.href = "allocation.html";
         }
 
-        updateSummary();
-        displayRequests();
+        loadEmergencyRequests();
     </script>
-
 </body>
 </html>
-
