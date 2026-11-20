@@ -4,6 +4,7 @@ import random
 from fastapi import FastAPI
 
 from backend.evaluation.experiments import run_current_backend_evaluation, compare_strategies
+from backend.evaluation.baseline import simulate_baseline
 from backend.load_data import load_data, get_requests
 from backend.game_rule import (
     check_request_fulfilment,
@@ -477,15 +478,31 @@ def get_initial_stock_totals():
 
 @app.get("/evaluation")
 def get_evaluation():
-    """Compare AI and player allocations for the selected game date."""
+    """Compare AI, player, and greedy baseline allocations."""
+
+    # Get AI allocations
     ai_allocations = prepare_evaluation_allocations(simulate_ai())
+
+    # Get player allocations
     player_allocations = prepare_evaluation_allocations(allocation_history)
+
+    # Run the greedy baseline using the same starting resources
+    baseline_history = simulate_baseline(
+        get_daily_requests(),
+        copy.deepcopy(original_hub_resources)
+    )
+
+    baseline_allocations = prepare_evaluation_allocations(baseline_history)
+
+    # Evaluate all three strategies
     results = run_current_backend_evaluation(
         ai_allocations=ai_allocations,
         human_allocations=player_allocations,
+        baseline_allocations=baseline_allocations,
         available_stock=get_initial_stock_totals(),
         scenario_name=selected_date,
     )
+
     return {
         "selected_date": selected_date,
         "game_state": get_game_state(),
