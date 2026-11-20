@@ -158,6 +158,85 @@
             color: #00e5ef;
         }
 
+        /* RESTART SIMULATION BUTTON */
+
+        .restart-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            width: min(100%, 520px);
+            box-sizing: border-box;
+            margin-top: 16px;
+            padding: 17px 25px;
+            border-radius: 14px;
+            border: 1px solid #ffc857;
+
+            background: linear-gradient(
+                110deg,
+                rgba(45, 34, 29, 0.88),
+                rgba(13, 27, 45, 0.95)
+            );
+
+            color: #ffc857;
+            font-family: inherit;
+            text-align: left;
+            cursor: pointer;
+
+            box-shadow: 0 0 18px rgba(255, 200, 87, 0.08);
+
+            transition:
+                transform 0.25s ease,
+                box-shadow 0.25s ease,
+                background 0.25s ease;
+        }
+
+        .restart-button:hover {
+            transform: translateY(-3px);
+            background: #3b3028;
+            box-shadow: 0 0 25px rgba(255, 200, 87, 0.25);
+        }
+
+        .restart-icon {
+            font-size: 26px;
+            color: #ffc857;
+        }
+
+        .restart-text {
+            flex: 1;
+        }
+
+        .restart-text strong {
+            display: block;
+            font-size: 18px;
+            letter-spacing: 1px;
+        }
+
+        .restart-text small {
+            display: block;
+            color: #b8a995;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        .restart-arrow {
+            font-size: 26px;
+            color: #ffc857;
+        }
+
+        .restart-button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none;
+        }
+
+        .simulation-status {
+            margin-top: 18px;
+            color: #9cb7c9;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
         /* QUESTION MARK + HOVER POPUP */
 
         .help-container {
@@ -282,6 +361,14 @@
                 font-size: 18px;
             }
 
+            .restart-button {
+                padding: 15px 18px;
+            }
+
+            .restart-text strong {
+                font-size: 16px;
+            }
+
             .help-container {
                 right: 20px;
                 bottom: 20px;
@@ -312,18 +399,52 @@
                 to communities in need.
             </p>
 
-            <a href="requests.html" class="play-button">
+            <!-- PLAY SIMULATION -->
+
+            <a href="requests.html"
+               class="play-button"
+               id="playButton">
+
                 <span class="play-icon">▶</span>
 
                 <span class="play-text">
-                    <strong>PLAY SIMULATION</strong>
-                    <small>
+                    <strong id="playButtonTitle">
+                        PLAY SIMULATION
+                    </strong>
+
+                    <small id="playButtonSubtitle">
                         Begin humanitarian resource allocation
                     </small>
                 </span>
 
                 <span class="play-arrow">›</span>
             </a>
+
+            <!-- RESTART SIMULATION -->
+
+            <button
+                type="button"
+                class="restart-button"
+                id="restartButton"
+                onclick="restartSimulation()"
+            >
+                <span class="restart-icon">↻</span>
+
+                <span class="restart-text">
+                    <strong>RESTART SIMULATION</strong>
+                    <small>
+                        Clear previous allocations and start again
+                    </small>
+                </span>
+
+                <span class="restart-arrow">›</span>
+            </button>
+
+            <p class="simulation-status"
+               id="simulationStatus"
+               role="status">
+                Checking simulation status...
+            </p>
 
         </div>
     </main>
@@ -364,6 +485,175 @@
 
     </div>
 
+    <script>
+        const API = "/api";
+
+        async function loadSimulationStatus() {
+            const statusText =
+                document.getElementById("simulationStatus");
+
+            const buttonTitle =
+                document.getElementById("playButtonTitle");
+
+            const buttonSubtitle =
+                document.getElementById("playButtonSubtitle");
+
+            const playButton =
+                document.getElementById("playButton");
+
+            try {
+                const response = await fetch(
+                    API + "/game-status",
+                    { cache: "no-store" }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Unable to retrieve simulation status."
+                    );
+                }
+
+                const data = await response.json();
+
+                const state = String(
+                    data.game_state ?? data.state ?? ""
+                ).toUpperCase();
+
+                if (state === "ALLOCATING") {
+                    buttonTitle.textContent =
+                        "CONTINUE SIMULATION";
+
+                    buttonSubtitle.textContent =
+                        "Continue allocating resources to emergencies";
+
+                    playButton.href = "requests.html";
+
+                    statusText.textContent =
+                        "Simulation in progress. Previous allocations are preserved.";
+
+                } else if (state === "COMPLETE") {
+                    buttonTitle.textContent =
+                        "VIEW SIMULATION RESULTS";
+
+                    buttonSubtitle.textContent =
+                        "Review your completed simulation";
+
+                    playButton.href = "results.html";
+
+                    statusText.textContent =
+                        "Simulation completed. Your results are ready.";
+
+                } else if (state === "READY") {
+                    buttonTitle.textContent =
+                        "PLAY SIMULATION";
+
+                    buttonSubtitle.textContent =
+                        "Begin humanitarian resource allocation";
+
+                    playButton.href = "requests.html";
+
+                    statusText.textContent =
+                        "Simulation ready. No allocations have been made.";
+
+                } else {
+                    statusText.textContent =
+                        "Select Play Simulation to view emergency requests.";
+                }
+
+            } catch (error) {
+                console.error(
+                    "Could not load simulation status:",
+                    error
+                );
+
+                statusText.textContent =
+                    "Simulation status unavailable. " +
+                    "You can still open Emergency Requests.";
+            }
+        }
+
+        async function restartSimulation() {
+            const confirmed = confirm(
+                "Are you sure you want to restart the simulation?\n\n" +
+                "All previous allocations will be cleared."
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            const restartButton =
+                document.getElementById("restartButton");
+
+            const statusText =
+                document.getElementById("simulationStatus");
+
+            restartButton.disabled = true;
+            statusText.textContent =
+                "Restarting simulation...";
+
+            try {
+                const response = await fetch(
+                    API + "/reset",
+                    { method: "POST" }
+                );
+
+                if (!response.ok) {
+                    let message = "The backend rejected the reset.";
+
+                    try {
+                        const data = await response.json();
+                        message = data.detail || data.message || message;
+                    } catch (_) {}
+
+                    throw new Error(
+                        typeof message === "string"
+                            ? message
+                            : JSON.stringify(message)
+                    );
+                }
+
+                // Clear the previously selected emergency.
+                sessionStorage.removeItem("selectedRequestId");
+
+                // Stay on the homepage and refresh the button labels.
+                document.getElementById("playButtonTitle").textContent =
+                    "PLAY SIMULATION";
+
+                document.getElementById("playButtonSubtitle").textContent =
+                    "Begin humanitarian resource allocation";
+
+                document.getElementById("playButton").href =
+                    "requests.html";
+
+                statusText.textContent =
+                    "Simulation restarted successfully. " +
+                    "All previous allocations have been cleared.";
+
+                // Verify the new state without navigating away.
+                await loadSimulationStatus();
+
+            } catch (error) {
+                console.error(
+                    "Simulation reset error:",
+                    error
+                );
+
+                statusText.textContent =
+                    "Could not restart the simulation.";
+
+                alert(
+                    "Could not restart the simulation: " +
+                    error.message
+                );
+
+            } finally {
+                restartButton.disabled = false;
+            }
+        }
+
+        loadSimulationStatus();
+    </script>
+
 </body>
 </html>
-
