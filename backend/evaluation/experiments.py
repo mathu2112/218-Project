@@ -53,11 +53,11 @@ def run_current_backend_evaluation(
         )
     )
 
-    # Include historical baseline when available
+    # Include greedy baseline when available
     if baseline_allocations is not None:
         results.append(
             run_experiment(
-                strategy_name="Historical Baseline",
+                strategy_name="Greedy Baseline",
                 allocations=baseline_allocations,
                 available_stock=available_stock,
                 scenario_name=scenario_name
