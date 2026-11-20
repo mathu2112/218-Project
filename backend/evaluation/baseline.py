@@ -1,117 +1,63 @@
 
-# This baseline is used to compare a simple allocation
-# strategy against the Fuzzy Logic AI approach.
-
-# It allocates resources based on:
-# 1. Expert priority
-# 2. Available hub stock
-# 3. Aircraft transport capacity
-# 4. Available flight slots
-
-
 import copy
+import pandas as pd
 
 from backend.game_rule import calculate_weight
 
 
-
-PRIORITY_ORDER = {
-    "Critical": 1,
-    "High": 2,
-    "Medium": 3,
-    "Low": 4
-}
-
-
-
-#RESOURCE WEIGHTS
-
-
-# These weights must match game_rule.py
-
+# Resource weights in tonnes
 RESOURCE_WEIGHTS = [0.01, 0.05, 0.02]
 
 
-
-#SAFE NUMBER CONVERSION
-
 def safe_int(value):
-    """Convert values safely into non-negative integers."""
-
+    """Convert a value to an integer safely."""
     try:
-        if value is None:
+        if pd.isna(value):
             return 0
-
         return max(0, int(float(value)))
-
     except (ValueError, TypeError):
         return 0
 
 
-#SORT EMERGENCY REQUESTS
-
-
 def sort_requests(daily_requests):
     """
-    Sort requests according to expert priority.
+    Sort requests using FIFO.
 
-    Critical requests are processed first,
-    followed by High, Medium and Low requests.
-
-    Requests with equal priority are sorted
-    by their request time.
+    The earliest request_datetime is processed first.
+    Priority does not affect the order.
     """
-
-    sorted_requests = daily_requests.copy()
-
-    sorted_requests["_priority_order"] = (
-        sorted_requests["expert_priority_label"]
-        .map(PRIORITY_ORDER)
-        .fillna(5)
-    )
-
-    sorted_requests = sorted_requests.sort_values(
-        by=["_priority_order", "request_datetime"],
-        ascending=True,
+    return daily_requests.sort_values(
+        by=["request_datetime", "request_id"],
+        ascending=[True, True],
         na_position="last"
-    )
+    ).copy()
 
-    return sorted_requests.drop(columns=["_priority_order"])
-
-
-# --------------------------------------------------
-# 5. CHECK REQUEST FULFILMENT
-# --------------------------------------------------
 
 def check_request_status(required, allocated):
-    """
-    Determine whether an emergency request
-    is fulfilled, partially fulfilled or unfulfilled.
-    """
+    """Determine whether a request is fulfilled, partially fulfilled or unfulfilled."""
 
-    if all(allocated[i] >= required[i] for i in range(3)):
-        return "Fulfilled"
+    total_required = sum(required)
+    total_allocated = sum(allocated)
 
-    if all(amount == 0 for amount in allocated):
-        return "Unfulfilled"
+    if total_required == 0:
+        return "fulfilled"
 
-    return "Partially Fulfilled"
+    if total_allocated >= total_required:
+        return "fulfilled"
 
+    if total_allocated > 0:
+        return "partial"
 
+    return "unfulfilled"
 
-#GREEDY RESOURCE ALLOCATION
 
 def allocate_greedily(required, available, capacity):
     """
-    Allocate the maximum possible quantity of resources.
-
-    The allocation follows a fixed order:
+    Allocate resources in a fixed order:
     Medicine -> Shelter -> Nutrition.
 
-    Allocation is restricted by:
-    - Required quantities
-    - Available hub stock
-    - Remaining aircraft capacity
+    Allocation cannot exceed the required quantity,
+    available stock or remaining transport capacity.
     """
 
     allocated = [0, 0, 0]
@@ -120,137 +66,128 @@ def allocate_greedily(required, available, capacity):
 
     for i in range(3):
 
-        # Maximum quantity allowed by request and stock
-        maximum = min(required[i], available[i])
+        required_amount = safe_int(required[i])
+        available_amount = safe_int(available[i])
 
-        # Maximum quantity that fits remaining capacity
-        capacity_limit = int(
-            remaining_capacity / RESOURCE_WEIGHTS[i]
-        )
+        # Maximum possible allocation based on demand and stock
+        maximum = min(required_amount, available_amount)
 
-        # Allocate the maximum quantity possible
-        amount = min(maximum, capacity_limit)
+        # Weight per unit of the resource
+        weight = RESOURCE_WEIGHTS[i]
 
-        allocated[i] = amount
+        # Calculate how many units can fit within remaining capacity
+        if weight > 0:
+            capacity_limit = int(remaining_capacity // weight)
+        else:
+            capacity_limit = maximum
 
-        # Update remaining aircraft capacity
-        remaining_capacity -= (
-            amount * RESOURCE_WEIGHTS[i]
-        )
+        # Final allocation
+        quantity = min(maximum, capacity_limit)
+
+        allocated[i] = quantity
+
+        # Reduce remaining transport capacity
+        remaining_capacity -= quantity * weight
 
     return allocated
 
 
-
-# BASELINE SIMULATION
-
-
 def simulate_baseline(daily_requests, initial_hub_resources):
     """
-    Run the priority-based greedy allocation simulation.
+    Run the FIFO baseline allocation simulation.
 
-    Parameters:
-        daily_requests:
-            Emergency requests for the selected date.
+    Requests are processed from earliest to latest arrival time.
+    Each request is allocated resources subject to:
+    - Available hub stock
+    - Remaining transport capacity
+    - Available flight slots
 
-        initial_hub_resources:
-            Initial stock, aircraft capacity and flight
-            slots for each supply hub.
-
-    Returns:
-        baseline_history:
-            List of allocation results for each request.
+    The original hub resources are not modified.
     """
 
-    # Create independent resources.
-    # This prevents changes to the original game resources.
-    baseline_resources = copy.deepcopy(initial_hub_resources)
+    # Make an independent copy of the hub resources
+    hub_resources = copy.deepcopy(initial_hub_resources)
 
-    # Sort requests by priority
+    # Sort requests using FIFO
     sorted_requests = sort_requests(daily_requests)
 
-    # Store allocation results
     baseline_history = []
 
-    # Process each emergency request
     for _, request in sorted_requests.iterrows():
 
-        hub_id = request["supply_hub"]
+        request_id = request["request_id"]
+        supply_hub = request["supply_hub"]
 
-        # Read required quantities
+        priority = request.get("expert_priority_label", "Unknown")
+        urgency = request.get("urgency_level", 0)
+        severity = request.get("severity_level", 0)
+
+        # Read required resources
         required = [
             safe_int(request["medicine_required_kits"]),
             safe_int(request["shelter_required_kits"]),
             safe_int(request["nutrition_required_parcels"])
         ]
 
-        # Prepare the result record
+        # Default allocation is zero
+        allocated = [0, 0, 0]
+
+        # Check whether the assigned hub exists
+        if supply_hub in hub_resources:
+
+            hub = hub_resources[supply_hub]
+
+            available_stock = hub["stock"]
+            remaining_capacity = hub["capacity"]
+            available_slots = hub["slots"]
+
+            # Allocate only if a flight slot is available
+            if available_slots > 0 and remaining_capacity > 0:
+
+                allocated = allocate_greedily(
+                    required,
+                    available_stock,
+                    remaining_capacity
+                )
+
+                # Check whether any resources were allocated
+                if sum(allocated) > 0:
+
+                    # Reduce hub stock
+                    for i in range(3):
+                        hub["stock"][i] -= allocated[i]
+
+                    # Calculate used transport capacity
+                    used_capacity = calculate_weight(allocated)
+
+                    hub["capacity"] -= used_capacity
+
+                    # One flight slot is used for this request
+                    hub["slots"] -= 1
+
+        # Determine request status
+        status = check_request_status(required, allocated)
+
+        # Save allocation results
         record = {
-            "request_id": request["request_id"],
-            "supply_hub": hub_id,
-            "expert_priority_label": request["expert_priority_label"],
-            "urgency_level": safe_int(request.get("urgency_level")),
-            "severity_level": safe_int(request.get("severity_level")),
+            "request_id": request_id,
+            "request_datetime": request.get("request_datetime"),
+            "supply_hub": supply_hub,
+            "expert_priority_label": priority,
+            "urgency_level": urgency,
+            "severity_level": severity,
 
             "medicine_required_kits": required[0],
             "shelter_required_kits": required[1],
             "nutrition_required_parcels": required[2],
 
-            "medicine_allocated": 0,
-            "shelter_allocated": 0,
-            "nutrition_allocated": 0,
+            "medicine_allocated": allocated[0],
+            "shelter_allocated": allocated[1],
+            "nutrition_allocated": allocated[2],
 
-            "status": "Unfulfilled"
+            "status": status
         }
 
-        # Check whether the assigned hub exists
-        if hub_id not in baseline_resources:
-            baseline_history.append(record)
-            continue
-
-        resources = baseline_resources[hub_id]
-
-        # Check transport availability
-        if resources["slots"] <= 0 or resources["capacity"] <= 0:
-            baseline_history.append(record)
-            continue
-
-        # Perform greedy allocation
-        allocated = allocate_greedily(
-            required,
-            resources["stock"],
-            resources["capacity"]
-        )
-
-        # Update resources only if something is allocated
-        if any(amount > 0 for amount in allocated):
-
-            # Calculate allocated transport weight
-            total_weight = calculate_weight(allocated)
-
-            # Reduce available hub stock
-            for i in range(3):
-                resources["stock"][i] -= allocated[i]
-
-            # Reduce remaining aircraft capacity
-            resources["capacity"] -= total_weight
-
-            # Use one flight slot
-            resources["slots"] -= 1
-
-        # Determine fulfilment status
-        status = check_request_status(
-            required,
-            allocated
-        )
-
-        # Update result record
-        record["medicine_allocated"] = allocated[0]
-        record["shelter_allocated"] = allocated[1]
-        record["nutrition_allocated"] = allocated[2]
-        record["status"] = status
-
-        # Save the result
         baseline_history.append(record)
 
     return baseline_history
